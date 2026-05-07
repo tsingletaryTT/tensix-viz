@@ -1,0 +1,8 @@
+{
+  "cards": ["bh-p300c", "bh-p300c"],
+  "layout": "vertical",
+  "labels": ["CARD 0", "CARD 1"],
+  "inter_links": [
+    { "connector": "samtec", "label": "Samtec cable · inter-card link", "from": { "card": 0 }, "to": { "card": 1 } }
+  ]
+}

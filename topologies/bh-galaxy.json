@@ -1,0 +1,8 @@
+{
+  "chips": 32,
+  "grid": [4, 8],
+  "arch": "blackhole",
+  "mesh_links": "full_2d",
+  "eth_ports": 56,
+  "eth_speed": "800G"
+}

@@ -1,0 +1,10 @@
+{
+  "arch": "blackhole",
+  "cols": 17,
+  "rows": 12,
+  "dram_rows": [0, 11],
+  "eth_cols": [0, 16],
+  "pcie_col": 8,
+  "compute_grid": { "col_start": 1, "col_end": 15, "row_start": 1, "row_end": 10 },
+  "eth_links": { "per_side": 2, "sides": ["N", "S", "E", "W"] }
+}

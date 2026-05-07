@@ -1,0 +1,7 @@
+{
+  "servers": 4,
+  "server_config": "bh-galaxy",
+  "topology": "2d_torus",
+  "grid": [4, 32],
+  "total_chips": 128
+}

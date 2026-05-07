@@ -1,0 +1,9 @@
+{
+  "cards": ["wh-n300", "wh-n300", "wh-n300", "wh-n300"],
+  "layout": "grid",
+  "grid": [2, 4],
+  "labels": ["Card 0", "Card 1", "Card 2", "Card 3"],
+  "inter_links": [
+    { "topology": "2d_mesh", "link_count": 2, "speed_gbps": 100 }
+  ]
+}

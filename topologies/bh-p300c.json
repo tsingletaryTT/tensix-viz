@@ -1,0 +1,8 @@
+{
+  "chips": ["bh-chip", "bh-chip"],
+  "layout": "horizontal",
+  "labels": ["ASIC1 (left)", "ASIC0 (right)"],
+  "intra_links": [
+    { "from": { "chip": 0, "eth": [10, 11] }, "to": { "chip": 1, "eth": [2, 3] } }
+  ]
+}

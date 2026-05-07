@@ -1,0 +1,8 @@
+{
+  "chips": ["wh-chip", "wh-chip"],
+  "layout": "horizontal",
+  "labels": ["Left (L)", "Right (R)"],
+  "intra_links": [
+    { "from": { "chip": 0 }, "to": { "chip": 1 }, "link_count": 2, "speed_gbps": 100 }
+  ]
+}
