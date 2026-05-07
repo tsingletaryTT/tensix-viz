@@ -37,6 +37,10 @@ SystemViz.prototype._init = function () {
   // Mark the container so CSS can target .tv-system for layout rules
   container.classList.add('tv-system')
 
+  if (!Array.isArray(topo.cards)) {
+    throw new Error('SystemViz requires a system-level topology with a "cards" array (e.g. "qb2", "t3000")')
+  }
+
   topo.cards.forEach(function (cardName, i) {
     // Card wrapper div — holds the label and the CardViz subtree
     const wrapper = document.createElement('div')
@@ -141,6 +145,7 @@ SystemViz.prototype.transitionTo = function (level, opts) {
     const cardIdx = opts.card != null ? opts.card : 0
     const chipIdx = opts.chip != null ? opts.chip : 0
     return this.transitionTo('card', { index: cardIdx }).then(function () {
+      if (this._destroyed) return
       return this._cards[cardIdx].transitionTo('chip', { index: chipIdx })
     }.bind(this))
   }
@@ -152,9 +157,9 @@ SystemViz.prototype.transitionTo = function (level, opts) {
   })
   this._container.classList.remove('tv-zoomed-in')
   this._hideBreadcrumb()
-  // Also reset any card-level chip zoom inside each card
-  this._cards.forEach(function (card) { card.transitionTo('system') })
-  return new Promise(function (resolve) { setTimeout(resolve, 300) })
+  // Also reset any card-level chip zoom inside each card; resolve when all finish
+  var resets = this._cards.map(function (card) { return card.transitionTo('system') })
+  return Promise.all(resets)
 }
 
 /**
@@ -168,7 +173,7 @@ SystemViz.prototype._showBreadcrumb = function (text) {
     this._breadcrumb = document.createElement('div')
     this._breadcrumb.classList.add('tv-breadcrumb')
     // Place before the first child so it appears at the very top
-    if (this._container.insertBefore && this._container.children[0]) {
+    if (this._container.children[0]) {
       this._container.insertBefore(this._breadcrumb, this._container.children[0])
     } else {
       this._container.appendChild(this._breadcrumb)
