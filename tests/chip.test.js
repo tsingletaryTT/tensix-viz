@@ -62,4 +62,28 @@ describe('TensixViz', () => {
     expect(() => viz.play([{ step: 'pause', ms: 10 }])).not.toThrow()
     viz.reset()
   })
+
+  it('activate() writes _heatmap at chip grid coordinates after a tick', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('inference')
+    // Let rAF tick execute (setup.js maps RAF to setTimeout(fn, 16))
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const hmap = viz._heatmap
+    expect(hmap).not.toBeNull()
+    // BH compute grid: colStart=1, colEnd=15, rowStart=1, rowEnd=10
+    // So hmap[1][1] should be a number, hmap[0] should be undefined
+    expect(typeof hmap[1][1]).toBe('number')
+    expect(hmap[0]).toBeUndefined()
+    viz.reset()
+  })
+
+  it('calling activate() twice cancels the first loop', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('idle')
+    const gen1 = viz._animGen
+    viz.activate('inference')  // calls reset() internally, increments _animGen
+    const gen2 = viz._animGen
+    expect(gen2).toBeGreaterThan(gen1)
+    viz.reset()
+  })
 })

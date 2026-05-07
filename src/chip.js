@@ -92,6 +92,9 @@
     this._rafId       = null;
     this._animGen     = 0;      // incremented on reset(); guards stale async callbacks
     this._resolveStep = null;
+    this._floatLabelData = null;  // floating label data, cleared by reset() and unhighlight
+    this._loop           = false; // whether activate/play should loop on completion
+    this._loopScript     = null;  // script to replay when _loop is true
 
     this._cellW = 0;
     this._cellH = 0;
