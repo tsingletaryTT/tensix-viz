@@ -9,13 +9,15 @@ import { loadTopology } from './topology.js'
  * @param {HTMLElement} container  - The div that CardViz owns
  * @param {string|object} config   - Topology name ('bh-p300c', 'wh-n300') or inline config
  */
-export function CardViz(container, config) {
+export function CardViz(container, config, options) {
   this._container = container
   this._topo      = loadTopology(config)   // throws for unknown names
+  this._options   = options || {}
   this._chips     = []   // TensixViz instances, one per chip
   this._chipEls   = []   // wrapper divs
   this._zoomed    = -1   // index of currently zoomed chip, or -1
   this._breadcrumb = null
+  this._destroyed  = false
   this._init()
 }
 
@@ -38,20 +40,20 @@ CardViz.prototype._init = function () {
     label.textContent = (topo.labels && topo.labels[i]) || ('Chip ' + i)
     wrapper.appendChild(label)
 
-    // Canvas
+    // Canvas — dimensions come from options if provided, else sensible defaults
     const canvas = document.createElement('canvas')
-    canvas.width  = 340
-    canvas.height = 240
+    canvas.width  = self._options.chipWidth  || 340
+    canvas.height = self._options.chipHeight || 240
     wrapper.appendChild(canvas)
 
     container.appendChild(wrapper)
     self._chipEls.push(wrapper)
 
-    // Resolve chip topology and build a TensixViz for it
+    // Resolve chip topology and build a TensixViz for it.
+    // Callers can invoke activate('idle') explicitly if they want the RAF loop.
     const chipTopo = loadTopology(chipName)
     const viz = new TensixViz(canvas, { arch: chipTopo.arch })
     self._chips.push(viz)
-    viz.activate('idle')
 
     // ETH link divider between chips (except after last)
     if (i < topo.chips.length - 1) {
@@ -70,6 +72,7 @@ CardViz.prototype._init = function () {
  * @param {string} mode  - Any mode accepted by TensixViz.activate()
  */
 CardViz.prototype.activate = function (mode) {
+  if (this._destroyed) return
   this._chips.forEach(function (chip, i) {
     setTimeout(function () { chip.activate(mode) }, i * 120)
   })
@@ -79,6 +82,7 @@ CardViz.prototype.activate = function (mode) {
  * Reset all chip visualizations to their blank initial state.
  */
 CardViz.prototype.reset = function () {
+  if (this._destroyed) return
   this._chips.forEach(function (chip) { chip.reset() })
 }
 
@@ -88,6 +92,7 @@ CardViz.prototype.reset = function () {
  * @param {number[]} indices  - Array of chip indices to highlight (others are un-highlighted)
  */
 CardViz.prototype.highlight = function (indices) {
+  if (this._destroyed) return
   const self = this
   this._chipEls.forEach(function (el, i) {
     if (indices.indexOf(i) !== -1) {
@@ -107,11 +112,13 @@ CardViz.prototype.highlight = function (indices) {
  * @returns {Promise<void>}
  */
 CardViz.prototype.transitionTo = function (level, opts) {
+  if (this._destroyed) return Promise.resolve()
   const self = this
   opts = opts || {}
 
   if (level === 'chip') {
-    const idx = opts.index || 0
+    // Use != null instead of || to avoid treating index 0 as falsy
+    const idx = opts.index != null ? opts.index : 0
     this._zoomed = idx
     this._chipEls.forEach(function (el, i) {
       if (i === idx) {
@@ -170,14 +177,12 @@ CardViz.prototype._hideBreadcrumb = function () {
  * After destroy() the instance must not be used.
  */
 CardViz.prototype.destroy = function () {
-  // Stop all chip animations
+  this._destroyed = true
+  // Stop all chip animations before clearing references
   this._chips.forEach(function (chip) { chip.reset() })
   this._chips   = []
   this._chipEls = []
-
-  // Clear the container.  The MockElement used in tests does not implement a
-  // working remove()-on-child-calls-parent-splice, so we directly reset the
-  // underlying _children array and also set innerHTML = '' for real DOM parity.
-  this._container._children = []
-  this._container.innerHTML = ''
+  this._breadcrumb = null
+  // Use the standard DOM API to remove all children in a single call
+  this._container.replaceChildren()
 }

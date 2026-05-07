@@ -43,6 +43,9 @@ class MockCanvasElement {
   get children() { return this._children }
   addEventListener() {}
   removeEventListener() {}
+  replaceChildren(...newChildren) {
+    this._children = [...newChildren]
+  }
 }
 
 // Generic DOM element.
@@ -67,6 +70,9 @@ class MockElement {
   get children() { return this._children }
   addEventListener() {}
   removeEventListener() {}
+  replaceChildren(...newChildren) {
+    this._children = [...newChildren]
+  }
   remove() {
     // no-op in isolation; parent would need to splice
   }
