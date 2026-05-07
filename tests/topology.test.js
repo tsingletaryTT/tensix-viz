@@ -45,7 +45,7 @@ describe('loadTopology', () => {
 
   it('loads bh-galaxy with 32 chips', () => {
     const t = loadTopology('bh-galaxy')
-    expect(t.chips).toBe(32)
+    expect(t.chip_count).toBe(32)  // chip_count avoids collision with the array "chips" field used in multi-chip card configs
     expect(t.grid).toEqual([4, 8])
   })
 
@@ -61,5 +61,11 @@ describe('loadTopology', () => {
 
   it('throws for unknown topology name', () => {
     expect(() => loadTopology('foobar')).toThrow('Unknown topology: "foobar"')
+  })
+
+  it('throws for non-object, non-string input', () => {
+    // null and primitive numbers are not valid topology names or config objects
+    expect(() => loadTopology(null)).toThrow('loadTopology')
+    expect(() => loadTopology(42)).toThrow('loadTopology')
   })
 })

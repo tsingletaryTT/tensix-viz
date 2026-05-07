@@ -1,5 +1,5 @@
 {
-  "chips": 32,
+  "chip_count": 32,
   "grid": [4, 8],
   "arch": "blackhole",
   "mesh_links": "full_2d",
