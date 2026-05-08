@@ -33,11 +33,13 @@ export function autoInit() {
   // New API: [data-viz] attribute
   document.querySelectorAll('[data-viz]').forEach(function (el) {
     const type   = el.dataset.viz
-    const config = el.dataset.config || el.dataset.arch || 'bh-chip'
-    const mode   = el.dataset.mode   || 'idle'
+    const config = el.dataset.config != null ? el.dataset.config
+                 : el.dataset.arch   != null ? el.dataset.arch
+                 : 'bh-chip'
+    const mode   = el.dataset.mode != null ? el.dataset.mode : 'idle'
 
     try {
-      var viz
+      let viz
       switch (type) {
         case 'chip':
           // data-viz="chip" targets a <canvas> element directly
@@ -70,9 +72,10 @@ export function autoInit() {
 }
 
 // Auto-run when the DOM is ready — browser context only.
-// Guarding on both `window` and `document` keeps this from firing in Node/test
-// environments where only `document` is polyfilled by setup.js.
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+// Guard on window.document (not just window) — test environments set a minimal
+// globalThis.window stub without a .document property, so this correctly
+// does not fire in Node/test environments.
+if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
   if (document.readyState === 'loading') {
     // DOM not yet ready — wait for it
     document.addEventListener('DOMContentLoaded', autoInit)

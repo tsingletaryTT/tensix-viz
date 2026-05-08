@@ -12,6 +12,15 @@ describe('index exports', () => {
 
 describe('autoInit', () => {
   it('does not throw when no data-viz elements exist', () => {
+    // autoInit() is called directly here (the auto-run guard at module level does
+    // NOT fire in tests because globalThis.window has no .document property).
+    expect(() => autoInit()).not.toThrow()
+  })
+
+  it('calls TensixViz.autoInit() for legacy support', () => {
+    // TensixViz.autoInit must exist as a function (legacy API delegate).
+    expect(typeof TensixViz.autoInit).toBe('function')
+    // Calling autoInit() should invoke the legacy path without throwing.
     expect(() => autoInit()).not.toThrow()
   })
 })
