@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tensix-viz — Examples</title>
+  <link rel="stylesheet" href="../tensix-viz.css">
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0a1420; color: #c0ccd8; margin: 0; padding: 32px; }
+    h1 { color: #4fd1c5; font-size: 1.4rem; margin-bottom: 4px; }
+    h2 { color: #81e6d9; font-size: 1rem; margin: 32px 0 12px; border-bottom: 1px solid #1a3c47; padding-bottom: 6px; }
+    p  { color: #607d8b; font-size: 0.875rem; margin-bottom: 16px; }
+    .demo-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 24px; }
+    .demo-card { background: #0d1f2d; border: 1px solid #1a3c47; border-radius: 8px; padding: 16px; }
+    .mode-btn  {
+      background: none; border: 1px solid #1a3c47; color: #81e6d9;
+      border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 0.8rem;
+      margin: 4px 4px 0 0;
+    }
+    .mode-btn:hover { border-color: #4fd1c5; }
+    .mode-btn.active { background: #1a3c47; border-color: #4fd1c5; }
+    code { background: #1a3c47; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; }
+    pre  { background: #0d1f2d; border: 1px solid #1a3c47; border-radius: 6px;
+           padding: 16px; overflow-x: auto; font-size: 0.8rem; color: #81e6d9; }
+  </style>
+</head>
+<body>
+  <h1>tensix-viz</h1>
+  <p>Tenstorrent hardware topology visualizer. Open this file directly — no server needed.</p>
+
+  <!-- ── 1. Single chip ─────────────────────────────────────────────── -->
+  <h2>1. TensixViz — Single chip (Blackhole 17×12)</h2>
+  <p>Activate an animation mode to see workload patterns across the core grid.</p>
+  <div class="demo-row">
+    <div class="demo-card">
+      <canvas id="chip-bh" width="340" height="240"></canvas>
+      <div style="margin-top:8px">
+        <button class="mode-btn active" onclick="setChipMode('idle',this)">idle</button>
+        <button class="mode-btn" onclick="setChipMode('inference',this)">inference</button>
+        <button class="mode-btn" onclick="setChipMode('diffusion',this)">diffusion</button>
+        <button class="mode-btn" onclick="setChipMode('agents',this)">agents</button>
+        <button class="mode-btn" onclick="setChipMode('explore',this)">explore</button>
+      </div>
+    </div>
+    <div class="demo-card">
+      <canvas id="chip-wh" width="240" height="240"></canvas>
+      <p style="margin:8px 0 0;font-size:0.75rem">Wormhole 10×12 — same modes</p>
+    </div>
+  </div>
+
+  <!-- ── 2. Card ────────────────────────────────────────────────────── -->
+  <h2>2. CardViz — P300c (2 BH chips, intra-card ETH)</h2>
+  <p>Click "zoom" to drill into a single chip. <code>viz.transitionTo('chip', {index: 0})</code></p>
+  <div class="demo-row">
+    <div class="demo-card">
+      <div id="card-bh"></div>
+      <div style="margin-top:8px">
+        <button class="mode-btn" onclick="cardViz.transitionTo('chip',{index:0})">zoom chip 0</button>
+        <button class="mode-btn" onclick="cardViz.transitionTo('chip',{index:1})">zoom chip 1</button>
+        <button class="mode-btn" onclick="cardViz.transitionTo('card')">zoom out</button>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div id="card-wh"></div>
+      <p style="margin:8px 0 0;font-size:0.75rem">n300 (2 WH chips)</p>
+    </div>
+  </div>
+
+  <!-- ── 3. System ──────────────────────────────────────────────────── -->
+  <h2>3. SystemViz — QB2 (2× P300c, 4 BH chips)</h2>
+  <div class="demo-row">
+    <div class="demo-card">
+      <div id="system-qb2"></div>
+      <div style="margin-top:8px">
+        <button class="mode-btn active" onclick="setSystemMode('idle',this)">idle</button>
+        <button class="mode-btn" onclick="setSystemMode('inference',this)">inference</button>
+        <button class="mode-btn" onclick="setSystemMode('diffusion',this)">diffusion</button>
+        <button class="mode-btn" onclick="setSystemMode('agents',this)">agents</button>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div id="system-t3000"></div>
+      <p style="margin:8px 0 0;font-size:0.75rem">T3000 (4× n300, 8 WH chips, 2×4 mesh)</p>
+    </div>
+  </div>
+
+  <!-- ── 4. Cluster ─────────────────────────────────────────────────── -->
+  <h2>4. ClusterViz — Galaxy BH (32 chips, 4×8 mesh)</h2>
+  <p>Click any tile to zoom into a server. <code>await viz.transitionTo('server', {index: 0})</code></p>
+  <div class="demo-row">
+    <div class="demo-card">
+      <div id="cluster-galaxy"></div>
+      <div style="margin-top:8px">
+        <button class="mode-btn active" onclick="setClusterMode('idle',this)">idle</button>
+        <button class="mode-btn" onclick="setClusterMode('inference',this)">inference</button>
+        <button class="mode-btn" onclick="setClusterMode('explore',this)">explore</button>
+        <button class="mode-btn" onclick="clusterViz.transitionTo('cluster')">zoom out</button>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div id="cluster-sc"></div>
+      <p style="margin:8px 0 0;font-size:0.75rem">Galaxy SC (128 chips, 2D torus)</p>
+    </div>
+  </div>
+
+  <!-- ── 5. Programmatic control ────────────────────────────────────── -->
+  <h2>5. Programmatic control</h2>
+  <p>Chain <code>await viz.transitionTo()</code> and <code>viz.activate()</code> for lesson sequences.</p>
+  <pre>const viz = new SystemViz(el, 'qb2')
+await viz.transitionTo('card', { index: 0 })   // zoom into card 0
+await viz.transitionTo('chip', { card: 0, chip: 1 }) // zoom into chip 1
+viz.activate('inference')                       // run animation
+await new Promise(r => setTimeout(r, 3000))
+await viz.transitionTo('system')               // zoom back out</pre>
+  <button class="mode-btn" onclick="runProgrammaticDemo()">&#9654; Run demo on QB2 above</button>
+
+  <script src="../tensix-viz.js"></script>
+  <script>
+    // ── 1. Chip ──
+    const chipBH = new TensixViz(document.getElementById('chip-bh'), { arch: 'blackhole' })
+    const chipWH = new TensixViz(document.getElementById('chip-wh'), { arch: 'wormhole'  })
+    chipBH.activate('idle')
+    chipWH.activate('idle')
+
+    function setChipMode(mode, btn) {
+      document.querySelectorAll('#chip-bh ~ div .mode-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      chipBH.activate(mode)
+      chipWH.activate(mode)
+    }
+
+    // ── 2. Card ──
+    const cardViz   = new CardViz(document.getElementById('card-bh'), 'bh-p300c')
+    const cardVizWH = new CardViz(document.getElementById('card-wh'), 'wh-n300')
+    cardViz.activate('idle')
+    cardVizWH.activate('idle')
+
+    // ── 3. System ──
+    const sysQB2   = new SystemViz(document.getElementById('system-qb2'),   'qb2')
+    const sysT3000 = new SystemViz(document.getElementById('system-t3000'), 't3000')
+    sysQB2.activate('idle')
+    sysT3000.activate('idle')
+
+    function setSystemMode(mode, btn) {
+      document.querySelectorAll('#system-qb2 ~ div .mode-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      sysQB2.activate(mode)
+    }
+
+    // ── 4. Cluster ──
+    const clusterViz = new ClusterViz(document.getElementById('cluster-galaxy'), 'bh-galaxy')
+    const clusterSC  = new ClusterViz(document.getElementById('cluster-sc'),     'bh-galaxy-sc')
+
+    function setClusterMode(mode, btn) {
+      document.querySelectorAll('#cluster-galaxy ~ div .mode-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      clusterViz.activate(mode)
+    }
+
+    // ── 5. Programmatic ──
+    async function runProgrammaticDemo() {
+      await sysQB2.transitionTo('card', { index: 0 })
+      sysQB2._cards[0].activate('inference')
+      await new Promise(r => setTimeout(r, 3000))
+      await sysQB2.transitionTo('system')
+      sysQB2.activate('idle')
+    }
+  </script>
+</body>
+</html>
