@@ -158,7 +158,7 @@ SystemViz.prototype.transitionTo = function (level, opts) {
   this._container.classList.remove('tv-zoomed-in')
   this._hideBreadcrumb()
   // Also reset any card-level chip zoom inside each card; resolve when all finish
-  var resets = this._cards.map(function (card) { return card.transitionTo('system') })
+  const resets = this._cards.map(function (card) { return card.transitionTo('system') })
   return Promise.all(resets)
 }
 

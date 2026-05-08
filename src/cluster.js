@@ -113,10 +113,10 @@ ClusterViz.prototype._startAnimation = function () {
   }
 
   // Snapshot mode and grid dimensions at start time; these are stable per call
-  var mode = this._activeMode
-  var cols = this._topo.grid ? this._topo.grid[1] : 8
-  var rows = this._topo.grid ? this._topo.grid[0] : 4
-  var t = 0
+  const mode = this._activeMode
+  const cols = this._topo.grid ? this._topo.grid[1] : 8
+  const rows = this._topo.grid ? this._topo.grid[0] : 4
+  let t = 0
 
   function tick() {
     // Stop immediately if the instance was destroyed between frames
@@ -124,9 +124,9 @@ ClusterViz.prototype._startAnimation = function () {
     t += 0.02
 
     tiles.forEach(function (tile, i) {
-      var col = i % cols
-      var row = Math.floor(i / cols)
-      var heat
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      let heat
 
       switch (mode) {
         // Inference: a wavefront sweeps left-to-right across columns
@@ -136,9 +136,9 @@ ClusterViz.prototype._startAnimation = function () {
 
         // Diffusion: concentric rings expand outward from the grid center
         case 'diffusion': {
-          var cx = cols / 2, cy = rows / 2
-          var dist = Math.sqrt((col - cx) * (col - cx) + (row - cy) * (row - cy))
-          var ring = (t % 1) * Math.sqrt(cx * cx + cy * cy)
+          const cx = cols / 2, cy = rows / 2
+          const dist = Math.sqrt((col - cx) * (col - cx) + (row - cy) * (row - cy))
+          const ring = (t % 1) * Math.sqrt(cx * cx + cy * cy)
           heat = Math.max(0, 1 - Math.abs(dist - ring) / 2)
           break
         }
@@ -169,7 +169,7 @@ ClusterViz.prototype._startAnimation = function () {
       //   0.0 → cool teal  (30,  74,  88)
       //   0.5 → warm gold  (244, 196, 113)
       //   1.0 → hot red    (255, 107, 107)
-      var r, g, b
+      let r, g, b
       if (heat < 0.5) {
         const s = heat * 2
         r = Math.round(30  + (244 - 30)  * s)
