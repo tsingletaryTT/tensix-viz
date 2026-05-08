@@ -23,6 +23,7 @@ export function ClusterViz(container, config) {
   this._animFrame  = null
   this._breadcrumb = null
   this._destroyed  = false
+  this._zoomed     = -1
 
   // Resolve chip count — handle both chip_count (bh-galaxy) and total_chips (bh-galaxy-sc).
   // Fall back to chips array length or a computed value from server count.
@@ -75,19 +76,18 @@ ClusterViz.prototype._init = function () {
 
   // Create one tile element per chip and register a click handler.
   // The handler maps each tile to the server node that contains it (32 chips/server).
-  for (var i = 0; i < this.chipCount; i++) {
+  // `let i` creates a new binding per iteration, so each click closure captures the
+  // correct index without needing an IIFE.
+  for (let i = 0; i < this.chipCount; i++) {
     const tile = document.createElement('div')
     tile.classList.add('tv-cluster-tile')
     // data-chip-index lets CSS and JS target individual tiles by chip position
     tile.dataset.chipIndex = String(i)
     tile.title = 'Chip ' + i
-    // IIFE captures `idx` so the closure does not share a single mutable `i`
-    ;(function (idx) {
-      tile.addEventListener('click', function () {
-        // Each group of 32 chips belongs to one server node
-        self.transitionTo('server', { index: Math.floor(idx / 32) })
-      })
-    })(i)
+    tile.addEventListener('click', function () {
+      // Each group of 32 chips belongs to one server node
+      self.transitionTo('server', { index: Math.floor(i / 32) })
+    })
     grid.appendChild(tile)
     self._tiles.push(tile)
   }
@@ -171,12 +171,12 @@ ClusterViz.prototype._startAnimation = function () {
       //   1.0 → hot red    (255, 107, 107)
       var r, g, b
       if (heat < 0.5) {
-        var s = heat * 2
+        const s = heat * 2
         r = Math.round(30  + (244 - 30)  * s)
         g = Math.round(74  + (196 - 74)  * s)
         b = Math.round(88  + (113 - 88)  * s)
       } else {
-        var s = (heat - 0.5) * 2
+        const s = (heat - 0.5) * 2
         r = Math.round(244 + (255 - 244) * s)
         g = Math.round(196 + (107 - 196) * s)
         b = Math.round(113 + (107 - 113) * s)
@@ -253,6 +253,7 @@ ClusterViz.prototype.transitionTo = function (level, opts) {
       else tile.classList.add('tv-hidden')
     })
     this._container.classList.add('tv-zoomed-in')
+    this._zoomed = serverIdx
     // Breadcrumb shows hierarchy: Cluster › Server N
     this._showBreadcrumb('Cluster \u203a Server ' + serverIdx)
   } else {
@@ -262,6 +263,7 @@ ClusterViz.prototype.transitionTo = function (level, opts) {
       tile.classList.remove('tv-hidden')
     })
     this._container.classList.remove('tv-zoomed-in')
+    this._zoomed = -1
     this._hideBreadcrumb()
   }
 

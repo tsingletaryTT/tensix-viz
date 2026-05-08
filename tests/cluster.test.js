@@ -23,9 +23,8 @@ describe('ClusterViz', () => {
 
   it('renders 32 tile elements for bh-galaxy', () => {
     const viz = new ClusterViz(container, 'bh-galaxy')
-    // The tile grid div contains one element per chip
-    const grid = container._children.find(el => el._tag === 'div')
     expect(viz.chipCount).toBe(32)
+    expect(viz._tiles.length).toBe(32)
     viz.destroy()
   })
 
@@ -58,5 +57,11 @@ describe('ClusterViz', () => {
     const viz = new ClusterViz(container, 'bh-galaxy')
     viz.destroy()
     expect(container._children.length).toBe(0)
+  })
+
+  it('highlight([0]) does not throw', () => {
+    const viz = new ClusterViz(container, 'bh-galaxy')
+    expect(() => viz.highlight([0])).not.toThrow()
+    viz.destroy()
   })
 })
