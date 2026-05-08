@@ -35,11 +35,17 @@
     <div class="demo-card">
       <canvas id="chip-bh" width="340" height="240"></canvas>
       <div style="margin-top:8px">
+        <span style="font-size:0.7rem;color:#607d8b;display:block;margin-bottom:4px">General</span>
         <button class="mode-btn active" onclick="setChipMode('idle',this)">idle</button>
         <button class="mode-btn" onclick="setChipMode('inference',this)">inference</button>
         <button class="mode-btn" onclick="setChipMode('diffusion',this)">diffusion</button>
         <button class="mode-btn" onclick="setChipMode('agents',this)">agents</button>
         <button class="mode-btn" onclick="setChipMode('explore',this)">explore</button>
+        <span style="font-size:0.7rem;color:#607d8b;display:block;margin:8px 0 4px">LLM states</span>
+        <button class="mode-btn" onclick="setChipMode('thinking',this)">thinking</button>
+        <button class="mode-btn" onclick="setChipMode('prefill',this)">prefill</button>
+        <button class="mode-btn" onclick="setChipMode('video',this)">video</button>
+        <button class="mode-btn" onclick="setChipMode('batch',this)">batch</button>
       </div>
     </div>
     <div class="demo-card">
@@ -72,10 +78,17 @@
     <div class="demo-card">
       <div id="system-qb2"></div>
       <div style="margin-top:8px">
+        <span style="font-size:0.7rem;color:#607d8b;display:block;margin-bottom:4px">General</span>
         <button class="mode-btn active" onclick="setSystemMode('idle',this)">idle</button>
         <button class="mode-btn" onclick="setSystemMode('inference',this)">inference</button>
         <button class="mode-btn" onclick="setSystemMode('diffusion',this)">diffusion</button>
         <button class="mode-btn" onclick="setSystemMode('agents',this)">agents</button>
+        <button class="mode-btn" onclick="setSystemMode('explore',this)">explore</button>
+        <span style="font-size:0.7rem;color:#607d8b;display:block;margin:8px 0 4px">LLM states</span>
+        <button class="mode-btn" onclick="setSystemMode('thinking',this)">thinking</button>
+        <button class="mode-btn" onclick="setSystemMode('prefill',this)">prefill</button>
+        <button class="mode-btn" onclick="setSystemMode('video',this)">video</button>
+        <button class="mode-btn" onclick="setSystemMode('batch',this)">batch</button>
       </div>
     </div>
     <div class="demo-card">

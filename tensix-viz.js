@@ -631,6 +631,29 @@ var _TensixVizBundle = (() => {
       },
       explore: function(c2, r2) {
         return (Math.sin(c2 * 0.6 + t * Math.PI * 4) * Math.cos(r2 * 0.4 + t * Math.PI * 2) + 1) / 2 * 0.85;
+      },
+      // ── LLM-specific states ──────────────────────────────────────────────────
+      thinking: function(c2, r2) {
+        return (Math.sin(t * Math.PI * 0.7 + c2 * 0.18 + r2 * 0.12) + 1) / 2 * 0.4 + 0.45;
+      },
+      prefill: function(c2, r2) {
+        var wave = t * 1.5 % 1 * (W + 6) - 3;
+        return Math.max(0, 1 - Math.abs(c2 - wave) / (W * 0.5)) * 0.95;
+      },
+      video: function(c2, r2) {
+        var cx = W / 2, cy = H / 2;
+        var dist = Math.sqrt((c2 - cx) * (c2 - cx) + (r2 - cy) * (r2 - cy));
+        var maxR = Math.sqrt(cx * cx + cy * cy);
+        var r1 = Math.max(0, 1 - Math.abs(dist - t % 1 * maxR) / 1.8) * 0.9;
+        var r22 = Math.max(0, 1 - Math.abs(dist - (t + 0.5) % 1 * maxR) / 1.8) * 0.9;
+        return Math.max(r1, r22);
+      },
+      batch: function(c2, r2) {
+        var speed = 0.7;
+        var w1 = Math.max(0, 1 - Math.abs(c2 - t * speed % 1 * W) / 2) * 0.85;
+        var w2 = Math.max(0, 1 - Math.abs(c2 - (t * speed + 0.33) % 1 * W) / 2) * 0.85;
+        var w3 = Math.max(0, 1 - Math.abs(c2 - (t * speed + 0.66) % 1 * W) / 2) * 0.85;
+        return Math.max(w1, w2, w3);
       }
     };
     var fn = MODES[mode];
@@ -1105,7 +1128,7 @@ var _TensixVizBundle = (() => {
     });
     this._container.classList.remove("tv-zoomed-in");
     this._hideBreadcrumb();
-    var resets = this._cards.map(function(card) {
+    const resets = this._cards.map(function(card) {
       return card.transitionTo("system");
     });
     return Promise.all(resets);
@@ -1198,17 +1221,17 @@ var _TensixVizBundle = (() => {
       cancelAnimationFrame(this._animFrame);
       this._animFrame = null;
     }
-    var mode = this._activeMode;
-    var cols = this._topo.grid ? this._topo.grid[1] : 8;
-    var rows = this._topo.grid ? this._topo.grid[0] : 4;
-    var t = 0;
+    const mode = this._activeMode;
+    const cols = this._topo.grid ? this._topo.grid[1] : 8;
+    const rows = this._topo.grid ? this._topo.grid[0] : 4;
+    let t = 0;
     function tick() {
       if (self._destroyed) return;
       t += 0.02;
       tiles.forEach(function(tile, i) {
-        var col = i % cols;
-        var row = Math.floor(i / cols);
-        var heat;
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        let heat;
         switch (mode) {
           // Inference: a wavefront sweeps left-to-right across columns
           case "inference":
@@ -1216,9 +1239,9 @@ var _TensixVizBundle = (() => {
             break;
           // Diffusion: concentric rings expand outward from the grid center
           case "diffusion": {
-            var cx = cols / 2, cy = rows / 2;
-            var dist = Math.sqrt((col - cx) * (col - cx) + (row - cy) * (row - cy));
-            var ring = t % 1 * Math.sqrt(cx * cx + cy * cy);
+            const cx = cols / 2, cy = rows / 2;
+            const dist = Math.sqrt((col - cx) * (col - cx) + (row - cy) * (row - cy));
+            const ring = t % 1 * Math.sqrt(cx * cx + cy * cy);
             heat = Math.max(0, 1 - Math.abs(dist - ring) / 2);
             break;
           }
@@ -1235,7 +1258,7 @@ var _TensixVizBundle = (() => {
             heat = Math.random() < 0.02 ? Math.random() * 0.35 : parseFloat(tile.dataset.heat || "0") * 0.92;
         }
         tile.dataset.heat = String(heat.toFixed(3));
-        var r, g, b;
+        let r, g, b;
         if (heat < 0.5) {
           const s = heat * 2;
           r = Math.round(30 + (244 - 30) * s);

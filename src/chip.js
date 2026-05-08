@@ -704,6 +704,38 @@
       explore: function (c, r) {
         return (Math.sin(c * 0.6 + t * Math.PI * 4) * Math.cos(r * 0.4 + t * Math.PI * 2) + 1) / 2 * 0.85;
       },
+      // ── LLM-specific states ──────────────────────────────────────────────────
+      thinking: function (c, r) {
+        // Chain-of-thought / extended reasoning — sustained full-grid glow with
+        // slow gentle oscillation. All cores moderately active; occasional
+        // brighter wave as the model "considers" a new reasoning step.
+        return (Math.sin(t * Math.PI * 0.7 + c * 0.18 + r * 0.12) + 1) / 2 * 0.4 + 0.45;
+      },
+      prefill: function (c, r) {
+        // Prompt ingestion — all tokens processed in parallel. Wide bright band
+        // sweeps the full grid quickly (high utilisation, short burst per cycle).
+        var wave = (t * 1.5 % 1) * (W + 6) - 3;
+        return Math.max(0, 1 - Math.abs(c - wave) / (W * 0.5)) * 0.95;
+      },
+      video: function (c, r) {
+        // Temporal diffusion — two phase-offset expanding rings simulating
+        // denoising across consecutive video frames.
+        var cx = W / 2, cy = H / 2;
+        var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
+        var maxR = Math.sqrt(cx * cx + cy * cy);
+        var r1   = Math.max(0, 1 - Math.abs(dist - (t          % 1) * maxR) / 1.8) * 0.9;
+        var r2   = Math.max(0, 1 - Math.abs(dist - ((t + 0.5)  % 1) * maxR) / 1.8) * 0.9;
+        return Math.max(r1, r2);
+      },
+      batch: function (c, r) {
+        // Batched inference — three concurrent decode streams at equal phase
+        // offsets crossing the grid simultaneously.
+        var speed = 0.7;
+        var w1 = Math.max(0, 1 - Math.abs(c - ((t * speed)        % 1) * W) / 2) * 0.85;
+        var w2 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.33) % 1) * W) / 2) * 0.85;
+        var w3 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.66) % 1) * W) / 2) * 0.85;
+        return Math.max(w1, w2, w3);
+      },
     };
 
     var fn = MODES[mode];
