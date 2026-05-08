@@ -751,7 +751,7 @@ TensixViz.autoInit = function() {
     if (playBtn) {
       playBtn.addEventListener("click", function() {
         const icon = playBtn.textContent.trim();
-        if (icon === "\u25B6" || icon === "\u25B6") {
+        if (icon.startsWith("\u25B6")) {
           playBtn.textContent = "\u23F8";
           viz.reset();
           viz.play(script);
@@ -1168,10 +1168,11 @@ ClusterViz.prototype._init = function() {
     topo.topology ? topo.topology : topo.mesh_links ? "2D mesh" : ""
   ].filter(Boolean).join(" \xB7 ");
   container.appendChild(spec);
-  const cols = topo.grid ? topo.grid[1] : this._dotMode ? 16 : 8;
+  this._cols = topo.grid ? topo.grid[1] : this._dotMode ? 16 : 8;
+  this._rows = topo.grid ? topo.grid[0] : 4;
   const grid = document.createElement("div");
   grid.classList.add("tv-cluster-grid");
-  grid.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
+  grid.style.gridTemplateColumns = "repeat(" + this._cols + ", 1fr)";
   container.appendChild(grid);
   this._grid = grid;
   for (let i = 0; i < this.chipCount; i++) {
@@ -1195,8 +1196,8 @@ ClusterViz.prototype._startAnimation = function() {
     this._animFrame = null;
   }
   const mode = this._activeMode;
-  const cols = this._topo.grid ? this._topo.grid[1] : 8;
-  const rows = this._topo.grid ? this._topo.grid[0] : 4;
+  const cols = this._cols;
+  const rows = this._rows;
   let t = 0;
   function tick() {
     if (self._destroyed) return;

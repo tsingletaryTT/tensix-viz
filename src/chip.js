@@ -894,7 +894,7 @@
       if (playBtn) {
         playBtn.addEventListener('click', function () {
           const icon = playBtn.textContent.trim();
-          if (icon === '▶' || icon === '▶') {
+          if (icon.startsWith('▶')) {
             playBtn.textContent = '⏸';
             viz.reset();
             viz.play(script);

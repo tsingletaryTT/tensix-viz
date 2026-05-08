@@ -72,10 +72,12 @@ ClusterViz.prototype._init = function () {
   // Drive column count from the topology rather than relying on the CSS
   // fallback (repeat(8,1fr)), which would wrap incorrectly for topologies
   // like bh-galaxy-sc whose grid is [4,32].
-  const cols = topo.grid ? topo.grid[1] : (this._dotMode ? 16 : 8)
+  // Store cols/rows on the instance so _startAnimation uses the same values
+  this._cols = topo.grid ? topo.grid[1] : (this._dotMode ? 16 : 8)
+  this._rows = topo.grid ? topo.grid[0] : 4
   const grid = document.createElement('div')
   grid.classList.add('tv-cluster-grid')
-  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
+  grid.style.gridTemplateColumns = 'repeat(' + this._cols + ', 1fr)'
   container.appendChild(grid)
   this._grid = grid
 
@@ -117,10 +119,11 @@ ClusterViz.prototype._startAnimation = function () {
     this._animFrame = null
   }
 
-  // Snapshot mode and grid dimensions at start time; these are stable per call
+  // Snapshot mode and grid dimensions at start time; these are stable per call.
+  // Use _cols/_rows set in _init() so dot-mode fallback (16 cols) stays consistent.
   const mode = this._activeMode
-  const cols = this._topo.grid ? this._topo.grid[1] : 8
-  const rows = this._topo.grid ? this._topo.grid[0] : 4
+  const cols = this._cols
+  const rows = this._rows
   let t = 0
 
   function tick() {
