@@ -68,9 +68,14 @@ ClusterViz.prototype._init = function () {
   ].filter(Boolean).join(' \u00b7 ')
   container.appendChild(spec)
 
-  // Tile grid — one div per chip, laid out by CSS grid
+  // Tile grid — one div per chip, laid out by CSS grid.
+  // Drive column count from the topology rather than relying on the CSS
+  // fallback (repeat(8,1fr)), which would wrap incorrectly for topologies
+  // like bh-galaxy-sc whose grid is [4,32].
+  const cols = topo.grid ? topo.grid[1] : (this._dotMode ? 16 : 8)
   const grid = document.createElement('div')
   grid.classList.add('tv-cluster-grid')
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
   container.appendChild(grid)
   this._grid = grid
 
