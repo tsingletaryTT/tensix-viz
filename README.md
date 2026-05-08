@@ -38,11 +38,29 @@ All classes share a common interface:
 
 | Method | Description |
 |--------|-------------|
-| `activate(mode)` | Start continuous animation. Modes: `idle`, `inference`, `diffusion`, `agents`, `explore` |
+| `activate(mode)` | Start continuous animation — see modes table below |
 | `reset()` | Stop animation, clear state |
 | `highlight(indices)` | Highlight chips/cards/nodes by index array |
 | `transitionTo(level, opts)` | Zoom in/out. Returns `Promise` resolving after 300ms |
 | `destroy()` | Clean up DOM and animation frames |
+
+### Animation modes
+
+Nine modes are available. All are **visual metaphors** — they suggest the conceptual nature of a workload, not a physically accurate trace of core activation. Real Tenstorrent workloads are dominated by matmuls that keep most or all Tensix cores busy simultaneously regardless of workload type. Modes marked ◆ most closely match what `tt-toplike` would actually show.
+
+| Mode | Pattern | Represents | Hardware reality |
+|------|---------|------------|-----------------|
+| `idle` | Quiet random shimmer | Background system activity | ARC firmware + DDR refresh; compute cores mostly clock-gated |
+| `inference` | Column sweep L→R | Sequential token generation | Matmul tiles distributed across full mesh; batch=1 decode is memory-BW-bound |
+| `diffusion` | Expanding ring from center | Image denoising timestep | DiT/U-Net = transformer forward passes, same pattern as inference |
+| `agents` | Random burst clusters | Async tool-call dispatch | Sustained compute-bound utilisation; "clusters" are logical, not physical |
+| `explore` | Sinusoidal wave | Particle Life physics field | Custom RISC-V kernels do distribute spatially — closest to spatial truth for Metalium workloads |
+| `thinking` ◆ | Sustained full-grid glow | Extended reasoning / CoT | **Most accurate** — long CoT inference is sustained high matmul utilisation across all cores |
+| `prefill` ◆ | Wide fast-moving band | Parallel prompt ingestion | **Close to accurate** — prefill is genuinely compute-bound and uses all cores simultaneously |
+| `video` | Two phase-offset rings | Temporal video frame denoising | 3D DiT (Wan, SkyReels) = transformer layers, not rings; same as `thinking` in practice |
+| `batch` ◆ | Three concurrent sweeps | Parallel batched decode | Reasonable abstraction — batched inference does run multiple sequences through the same compute |
+
+For live per-core utilisation data, see [tt-toplike](https://github.com/tenstorrent/tt-toplike).
 
 ### TensixViz — single chip
 

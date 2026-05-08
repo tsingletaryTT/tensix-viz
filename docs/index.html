@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tensix-viz — Tenstorrent hardware visualizer</title>
+  <link rel="stylesheet" href="../tensix-viz.css">
+  <style>
+    :root {
+      --bg0:        #080f14;
+      --bg1:        #0d1b24;
+      --card:       #162838;
+      --card2:      #1a3040;
+      --teal:       #4fd1c5;
+      --teal-dim:   #3aada2;
+      --teal-glow:  rgba(79,209,197,.15);
+      --pink:       #ec96b8;
+      --gold:       #f4c471;
+      --green:      #27ae60;
+      --text:       #e8f0f2;
+      --text2:      #b0c4d0;
+      --muted:      #607d8b;
+      --border:     rgba(79,209,197,.18);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg0);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+    }
+
+    /* ── Nav ────────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,15,20,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 clamp(1.25rem, 5vw, 5rem);
+      display: flex; align-items: center; gap: 2rem;
+      height: 56px;
+    }
+    .nav-title { color: var(--teal); font-weight: 600; font-size: 1rem; text-decoration: none; letter-spacing: -.01em; }
+    .nav-links  { display: flex; gap: 1.5rem; margin-left: auto; }
+    .nav-links a { color: var(--text2); text-decoration: none; font-size: 0.875rem; transition: color .15s; }
+    .nav-links a:hover { color: var(--teal); }
+
+    /* ── Sections ───────────────────────────────────────────────────────── */
+    section { padding: 5rem 0; }
+    section:nth-of-type(even) { background: var(--bg1); }
+    .section-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 clamp(1.25rem, 5vw, 5rem);
+    }
+    .section-label {
+      font-size: 0.75rem; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--teal); margin-bottom: 0.75rem;
+    }
+    h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.1; margin: 0 0 1.25rem; }
+    h2 { font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.2; margin: 0 0 1rem; }
+    p  { color: var(--text2); max-width: 64ch; margin: 0 0 1rem; }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero { padding: 6rem 0; background: var(--bg0); }
+    .hero-inner {
+      max-width: 1200px; margin: 0 auto;
+      padding: 0 clamp(1.25rem, 5vw, 5rem);
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 4rem; align-items: center;
+    }
+    .hero-text p { max-width: 48ch; }
+    .hero-text h1 span { color: var(--teal); }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(79,209,197,.08); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 0.75rem; color: var(--teal); margin-bottom: 1.5rem;
+    }
+    .hero-canvas-wrap {
+      background: #0d1f2d;
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .hero-links { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--teal); color: #081218;
+      border: none; border-radius: 8px;
+      padding: 10px 20px; font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--teal-glow); }
+    .btn-outline {
+      background: transparent; color: var(--text2);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 20px; font-size: 0.875rem;
+      cursor: pointer; text-decoration: none;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-outline:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── Chip anatomy ───────────────────────────────────────────────────── */
+    .chip-anatomy {
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 3rem; align-items: start;
+    }
+    .legend-list { list-style: none; padding: 0; margin: 0; }
+    .legend-list li {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .legend-list li:last-child { border-bottom: none; }
+    .legend-dot { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; margin-top: 3px; }
+    .legend-list strong { color: var(--text); font-size: 0.875rem; }
+    .legend-list p { font-size: 0.8rem; margin: 2px 0 0; }
+
+    /* ── Callout ─────────────────────────────────────────────────────────── */
+    .callout {
+      background: var(--card); border: 1px solid var(--border);
+      border-left: 3px solid var(--teal);
+      border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 3rem;
+    }
+    .callout p { margin: 0; font-size: 0.875rem; max-width: none; }
+    .callout strong { color: var(--text); }
+    .callout a { color: var(--teal); }
+
+    /* ── Mode grid ───────────────────────────────────────────────────────── */
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .mode-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .mode-card:hover {
+      border-color: var(--teal);
+      box-shadow: 0 0 28px var(--teal-glow);
+    }
+    .mode-canvas-wrap {
+      background: #0d1f2d; padding: 16px;
+      display: flex; justify-content: center;
+    }
+    .mode-info { padding: 14px 16px 16px; }
+    .mode-badge {
+      display: inline-block; font-size: 0.68rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 4px; margin-bottom: 8px;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .badge-metaphor { background: rgba(79,209,197,.1);  color: var(--teal); }
+    .badge-grounded { background: rgba(39,174,96,.15);  color: var(--green); }
+    .mode-name {
+      font-family: 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+      font-size: 1rem; color: var(--teal); font-weight: 600; margin-bottom: 6px;
+    }
+    .mode-concept { color: var(--text2); font-size: 0.85rem; margin: 0 0 10px; }
+    .mode-reality {
+      font-size: 0.78rem; color: var(--muted);
+      border-top: 1px solid rgba(255,255,255,.06);
+      padding-top: 10px; margin: 0; line-height: 1.5;
+    }
+    .mode-reality .hw-label {
+      color: var(--muted); font-weight: 600; font-size: 0.7rem;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      display: block; margin-bottom: 3px;
+    }
+
+    /* ── Code block ──────────────────────────────────────────────────────── */
+    pre {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.5rem;
+      overflow-x: auto; font-size: 0.83rem;
+      color: var(--text2); line-height: 1.65; margin: 0 0 1.5rem;
+    }
+    code { font-family: 'Fira Code', 'Cascadia Code', ui-monospace, monospace; }
+    .ct { color: var(--teal); }
+    .cg { color: var(--gold); }
+    .cm { color: var(--muted); }
+
+    /* ── Quick reference table ───────────────────────────────────────────── */
+    .ref-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .ref-table th {
+      text-align: left; padding: 8px 12px;
+      color: var(--muted); font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .ref-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+    .ref-table tr:last-child td { border-bottom: none; }
+    .ref-table td:first-child code {
+      background: rgba(79,209,197,.08); color: var(--teal);
+      padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer {
+      background: var(--bg0); border-top: 1px solid var(--border);
+      padding: 2rem clamp(1.25rem, 5vw, 5rem);
+      display: flex; align-items: center; gap: 2rem;
+      color: var(--muted); font-size: 0.8rem; flex-wrap: wrap;
+    }
+    footer a { color: var(--text2); text-decoration: none; transition: color .15s; }
+    footer a:hover { color: var(--teal); }
+    footer .sep { color: var(--border); }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .hero-inner    { grid-template-columns: 1fr; }
+      .chip-anatomy  { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a class="nav-title" href="#">tensix-viz</a>
+    <div class="nav-links">
+      <a href="#grid">The Grid</a>
+      <a href="#modes">Animation Modes</a>
+      <a href="#api">API</a>
+      <a href="../examples/">Examples</a>
+      <a href="https://github.com/tsingletaryTT/tensix-viz">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-text">
+        <div class="hero-badge">
+          <span style="color:var(--teal)">◆</span> Tenstorrent
+        </div>
+        <h1>Visualize the <span>silicon</span>.</h1>
+        <p>tensix-viz renders Tenstorrent hardware — from a single Tensix core up to a Galaxy SuperCluster — in a zero-dependency Canvas file. Nine animation modes make each workload visible on the chip.</p>
+        <p style="font-size:0.875rem">Used in QB2 welcome pages, VS Code lessons, and standalone explainers.</p>
+        <div class="hero-links">
+          <a class="btn-primary" href="../examples/">Open examples</a>
+          <a class="btn-outline" href="https://github.com/tsingletaryTT/tensix-viz">View on GitHub</a>
+        </div>
+      </div>
+      <div class="hero-canvas-wrap">
+        <div id="hero-sys"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The Grid ────────────────────────────────────────────────────────── -->
+  <section id="grid">
+    <div class="section-inner">
+      <div class="section-label">Architecture</div>
+      <h2>What are we looking at?</h2>
+      <p>Every canvas maps directly to real Tenstorrent silicon. Understanding the grid makes the animations meaningful.</p>
+
+      <div class="chip-anatomy">
+        <div>
+          <canvas id="anatomy-chip" width="340" height="240"></canvas>
+        </div>
+        <div>
+          <ul class="legend-list">
+            <li>
+              <span class="legend-dot" style="background:#4FD1C5"></span>
+              <div>
+                <strong>Tensix cores</strong>
+                <p>The bright cells. 120 on Blackhole (P100/P150/P300c), 64 on Wormhole (N150/N300). Each Tensix runs five RISC-V CPUs plus a matrix engine (the FPU tile that does 8×8 matmuls). These are the cores that get hot during model inference — and what the animations are showing.</p>
+              </div>
+            </li>
+            <li>
+              <span class="legend-dot" style="background:#1A2540; border:1px solid #2D3F6A"></span>
+              <div>
+                <strong>DRAM rows</strong>
+                <p>Top and bottom rows are DRAM controllers. Blackhole has 8× 16 GB DDR6 banks — 128 GB total, 2 TB/s bandwidth. DRAM bandwidth (not compute) is the bottleneck for batch=1 LLM decode. The visualizer shows them dimmer because they're not "compute" in the animation sense.</p>
+              </div>
+            </li>
+            <li>
+              <span class="legend-dot" style="background:#2A1A40; border:1px solid #5B3DA0"></span>
+              <div>
+                <strong>ETH columns</strong>
+                <p>Left and right columns (and some edges) are Ethernet links. 2× 400G per side on Blackhole, used for the 2D torus NoC that connects chips within a card, cards within a server, and servers within a Galaxy cluster. The inter-chip ring animations in CardViz trace these links.</p>
+              </div>
+            </li>
+            <li>
+              <span class="legend-dot" style="background:#2A2010; border:1px solid #8B6914"></span>
+              <div>
+                <strong>PCIe bridge (col 8)</strong>
+                <p>A single column reserved for the host PCIe interface. This is the gap you see splitting the compute grid on Blackhole — col 8 is not a Tensix core. Models run entirely on-chip once loaded; PCIe is only active during weight transfer.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Animation Modes ─────────────────────────────────────────────────── -->
+  <section id="modes">
+    <div class="section-inner">
+      <div class="section-label">Animation</div>
+      <h2>Nine modes. Visual metaphors, not telemetry.</h2>
+
+      <div class="callout">
+        <p>
+          <strong>These animations are not hardware telemetry.</strong>
+          Real Tenstorrent workloads are dominated by matrix multiplications. Those keep most Tensix cores busy simultaneously — a uniform bright grid — regardless of whether the model is a language model, a diffusion model, or a custom kernel. The patterns below are chosen to be visually distinct and conceptually evocative, not physically accurate. Modes marked <span class="mode-badge badge-grounded" style="display:inline-block;margin:0 2px">grounded</span> are the closest to what <a href="https://github.com/tenstorrent/tt-toplike">tt-toplike</a> would actually show. For true per-core telemetry, pipe <code style="font-size:0.8rem;background:var(--card2);padding:1px 5px;border-radius:3px">tt-smi</code> heat data into the <code style="font-size:0.8rem;background:var(--card2);padding:1px 5px;border-radius:3px">heatmap</code> step type.
+        </p>
+      </div>
+
+      <div class="mode-grid">
+
+        <!-- idle -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-idle" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-metaphor">metaphor</span>
+            <div class="mode-name">idle</div>
+            <p class="mode-concept">Quiet random shimmer at 20–35%. Background system activity.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              ARC management firmware, DDR refresh cycles, thermal monitoring. Compute cores are mostly clock-gated; nothing is scheduled.
+            </p>
+          </div>
+        </div>
+
+        <!-- inference -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-inference" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-metaphor">metaphor</span>
+            <div class="mode-name">inference</div>
+            <p class="mode-concept">Left-to-right column sweep. Sequential token generation.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Batch=1 decode is memory-bandwidth-bound, not compute-bound. Matmul tiles distribute across the full mesh simultaneously. The sweep is an abstraction of autoregressive token dependency — not a physical firing sequence.
+            </p>
+          </div>
+        </div>
+
+        <!-- diffusion -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-diffusion" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-metaphor">metaphor</span>
+            <div class="mode-name">diffusion</div>
+            <p class="mode-concept">Expanding ring from chip center. Denoising timestep propagation.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              FLUX.1 and SD3 use DiT (Diffusion Transformer) architectures. Each denoising step is a standard transformer forward pass — attention + FFN matmuls across all cores. Physically identical to the inference pattern.
+            </p>
+          </div>
+        </div>
+
+        <!-- agents -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-agents" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-metaphor">metaphor</span>
+            <div class="mode-name">agents</div>
+            <p class="mode-concept">Random burst clusters. Async tool-call dispatch and response.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Tool execution phases are compute-bound; all 120 cores are available to every task. The "clusters" represent logical agent roles — not physical core groupings. The actual hardware view looks closer to <code style="font-size:0.75rem;background:var(--card2);padding:1px 4px;border-radius:3px">inference</code>.
+            </p>
+          </div>
+        </div>
+
+        <!-- explore -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-explore" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-metaphor">metaphor</span>
+            <div class="mode-name">explore</div>
+            <p class="mode-concept">Phase-offset sinusoidal wave. Particle Life physics field propagation.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Custom RISC-V kernels on Metalium do distribute work spatially across the mesh. For Particle Life specifically, compute regions roughly correspond to particle neighbourhoods — this mode is the closest to spatial truth for custom kernel workloads.
+            </p>
+          </div>
+        </div>
+
+        <!-- thinking -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-thinking" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-grounded">grounded</span>
+            <div class="mode-name">thinking</div>
+            <p class="mode-concept">Sustained full-grid glow with slow oscillation. Extended reasoning / chain-of-thought.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              The most physically accurate of all nine modes. Long chain-of-thought inference (DeepSeek R1, QwQ-32B) is sustained high matmul utilisation across all Tensix cores with minimal idle time between tokens — essentially what the glow shows.
+            </p>
+          </div>
+        </div>
+
+        <!-- prefill -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-prefill" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-grounded">grounded</span>
+            <div class="mode-name">prefill</div>
+            <p class="mode-concept">Wide bright band sweeping the full grid. All prompt tokens processed in parallel.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Prefill is genuinely compute-bound and uses all cores simultaneously — unlike decode, which is memory-bound. The wide band is a reasonable approximation of what tt-toplike shows during a long-context prompt ingestion burst.
+            </p>
+          </div>
+        </div>
+
+        <!-- video -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-video" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-metaphor">metaphor</span>
+            <div class="mode-name">video</div>
+            <p class="mode-concept">Two phase-offset expanding rings. Denoising across consecutive video frames.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Wan 2.2 and SkyReels use 3D DiT models — each frame step is a full transformer forward pass, same as <code style="font-size:0.75rem;background:var(--card2);padding:1px 4px;border-radius:3px">thinking</code> in practice. The second ring is a visual hint at temporal sequence; it has no physical correlate.
+            </p>
+          </div>
+        </div>
+
+        <!-- batch -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-batch" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-grounded">grounded</span>
+            <div class="mode-name">batch</div>
+            <p class="mode-concept">Three concurrent column sweeps. Parallel batched decode for multiple sequences.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Batched inference does run multiple sequences through the same compute simultaneously, and larger batches improve compute efficiency. The concurrent sweeps are a reasonable visual simplification of that parallelism.
+            </p>
+          </div>
+        </div>
+
+      </div><!-- end mode-grid -->
+    </div>
+  </section>
+
+  <!-- ── API Quick Start ─────────────────────────────────────────────────── -->
+  <section id="api">
+    <div class="section-inner">
+      <div class="section-label">Integration</div>
+      <h2>Quick start</h2>
+      <p>Drop in the IIFE bundle and start any mode with a single call. No build step, no dependencies.</p>
+
+      <pre><code><span class="cm">// Script tag</span>
+<span class="ct">&lt;link</span> rel=<span class="cg">"stylesheet"</span> href=<span class="cg">"tensix-viz.css"</span><span class="ct">&gt;</span>
+<span class="ct">&lt;script</span> src=<span class="cg">"tensix-viz.js"</span><span class="ct">&gt;&lt;/script&gt;</span>
+
+<span class="cm">// Single Blackhole chip — any mode</span>
+<span class="ct">const</span> viz = <span class="ct">new</span> TensixViz(canvas, { arch: <span class="cg">'blackhole'</span> })
+viz.activate(<span class="cg">'thinking'</span>)  <span class="cm">// or 'prefill', 'batch', 'inference' …</span>
+
+<span class="cm">// Full QB2 system (4 chips, intra/inter-card ETH links)</span>
+<span class="ct">const</span> sys = <span class="ct">new</span> SystemViz(container, <span class="cg">'qb2'</span>)
+sys.activate(<span class="cg">'batch'</span>)
+
+<span class="cm">// HTML auto-init — no JS required</span>
+<span class="ct">&lt;canvas</span> data-viz=<span class="cg">"chip"</span> data-config=<span class="cg">"blackhole"</span> data-mode=<span class="cg">"prefill"</span>
+        width=<span class="cg">"340"</span> height=<span class="cg">"240"</span><span class="ct">&gt;&lt;/canvas&gt;</span></code></pre>
+
+      <h2 style="font-size:1.25rem;margin-top:2.5rem">All modes</h2>
+      <table class="ref-table">
+        <thead>
+          <tr>
+            <th>Mode</th>
+            <th>Represents</th>
+            <th>Accuracy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>idle</code></td><td>Background system activity</td><td style="color:var(--muted)">metaphor</td></tr>
+          <tr><td><code>inference</code></td><td>Sequential token generation</td><td style="color:var(--muted)">metaphor</td></tr>
+          <tr><td><code>diffusion</code></td><td>Image denoising timestep (DiT)</td><td style="color:var(--muted)">metaphor</td></tr>
+          <tr><td><code>agents</code></td><td>Async tool-call dispatch</td><td style="color:var(--muted)">metaphor</td></tr>
+          <tr><td><code>explore</code></td><td>Particle Life physics field</td><td style="color:var(--muted)">metaphor — closest for Metalium</td></tr>
+          <tr><td><code>thinking</code></td><td>Extended reasoning / chain-of-thought</td><td style="color:var(--green)">◆ grounded</td></tr>
+          <tr><td><code>prefill</code></td><td>Parallel prompt ingestion</td><td style="color:var(--green)">◆ grounded</td></tr>
+          <tr><td><code>video</code></td><td>Temporal video frame denoising (3D DiT)</td><td style="color:var(--muted)">metaphor</td></tr>
+          <tr><td><code>batch</code></td><td>Batched parallel decode</td><td style="color:var(--green)">◆ grounded</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>tensix-viz — Tenstorrent hardware topology visualizer</span>
+    <span class="sep">·</span>
+    <a href="https://github.com/tsingletaryTT/tensix-viz">GitHub</a>
+    <span class="sep">·</span>
+    <a href="../examples/">Examples</a>
+    <span class="sep">·</span>
+    <a href="https://docs.tenstorrent.com">docs.tenstorrent.com</a>
+  </footer>
+
+  <script src="../tensix-viz.js"></script>
+  <script>
+    // Hero — QB2 system running thinking mode
+    const heroSys = new SystemViz(document.getElementById('hero-sys'), 'qb2')
+    heroSys.activate('thinking')
+
+    // Anatomy chip — idle so all cell types are visible
+    const anatomyChip = new TensixViz(document.getElementById('anatomy-chip'), { arch: 'blackhole' })
+    anatomyChip.activate('idle')
+
+    // Nine mode canvases
+    const MODES = ['idle','inference','diffusion','agents','explore','thinking','prefill','video','batch']
+    MODES.forEach(function(mode) {
+      const canvas = document.getElementById('m-' + mode)
+      if (!canvas) return
+      const viz = new TensixViz(canvas, { arch: 'blackhole' })
+      viz.activate(mode)
+    })
+  </script>
+</body>
+</html>
