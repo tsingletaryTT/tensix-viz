@@ -1,5 +1,5 @@
 // tests/chip.test.js
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { TensixViz } from '../src/chip.js'
 
 function makeCanvas() {
@@ -85,5 +85,63 @@ describe('TensixViz', () => {
     const gen2 = viz._animGen
     expect(gen2).toBeGreaterThan(gen1)
     viz.reset()
+  })
+})
+
+describe('TensixViz._resolveTheme', () => {
+  function makeCanvasInContainer(themeClass) {
+    const canvas = document.createElement('canvas')
+    canvas.width = 340; canvas.height = 240
+    const container = document.createElement('div')
+    if (themeClass) container.classList.add(themeClass)
+    container.appendChild(canvas)
+    return { canvas, container }
+  }
+
+  let _origMatchMedia
+  beforeEach(() => { _origMatchMedia = globalThis.window.matchMedia })
+  afterEach(()  => { globalThis.window.matchMedia = _origMatchMedia })
+
+  it('returns THEME_DARK by default (no theme class on any ancestor)', () => {
+    const { canvas } = makeCanvasInContainer(null)
+    const viz = new TensixViz(canvas, { arch: 'wormhole' })
+    const T = viz._resolveTheme()
+    expect(T.bg).toBe('#0B1E28')
+  })
+
+  it('returns THEME_LIGHT when direct parent has tv-light', () => {
+    const { canvas } = makeCanvasInContainer('tv-light')
+    const viz = new TensixViz(canvas, { arch: 'wormhole' })
+    const T = viz._resolveTheme()
+    expect(T.bg).toBe('#EEF4F8')
+  })
+
+  it('returns THEME_LIGHT when grandparent has tv-light', () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 340; canvas.height = 240
+    const inner = document.createElement('div')
+    const outer = document.createElement('div')
+    outer.classList.add('tv-light')
+    inner.appendChild(canvas)
+    outer.appendChild(inner)
+    const viz = new TensixViz(canvas, { arch: 'wormhole' })
+    const T = viz._resolveTheme()
+    expect(T.bg).toBe('#EEF4F8')
+  })
+
+  it('returns THEME_DARK when tv-auto and OS is dark (matchMedia returns false)', () => {
+    globalThis.window.matchMedia = () => ({ matches: false })
+    const { canvas } = makeCanvasInContainer('tv-auto')
+    const viz = new TensixViz(canvas, { arch: 'wormhole' })
+    const T = viz._resolveTheme()
+    expect(T.bg).toBe('#0B1E28')
+  })
+
+  it('returns THEME_LIGHT when tv-auto and OS is light (matchMedia returns true)', () => {
+    globalThis.window.matchMedia = () => ({ matches: true })
+    const { canvas } = makeCanvasInContainer('tv-auto')
+    const viz = new TensixViz(canvas, { arch: 'wormhole' })
+    const T = viz._resolveTheme()
+    expect(T.bg).toBe('#EEF4F8')
   })
 })

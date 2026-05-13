@@ -44,33 +44,78 @@
   };
 
   // ─── Theme ─────────────────────────────────────────────────────────────────
-  const THEME = {
-    bg:          '#0F2A35',
-    grid:        '#1A3C47',
-    tensix:      '#1E4A58',
-    tensixBorder:'#2D6675',
-    tensixActive:'#4FD1C5',
-    tensixPulse: '#81E6D9',
-    dram:        '#1A2540',
-    dramBorder:  '#2D3F6A',
-    eth:         '#2A1A40',
-    ethBorder:   '#5B3DA0',
-    pcie:        '#2A2010',
-    pcieBorder:  '#8B6914',
-    empty:       '#0D2030',
-    text:        '#E8F0F2',
-    textMuted:   '#607D8B',
-    teal:        '#4FD1C5',
-    tealLight:   '#81E6D9',
-    pink:        '#EC96B8',
-    gold:        '#F4C471',
-    green:       '#27AE60',
-    red:         '#FF6B6B',
-    particle:    '#4FD1C5',
-    heatLow:     '#1E4A58',
-    heatMid:     '#F4C471',
-    heatHigh:    '#FF6B6B',
+  // THEME_DARK — improved contrast (border #3A7A8C gives clear delta from fill #163848)
+  const THEME_DARK = {
+    bg:            '#0B1E28',
+    grid:          '#1A3C47',
+    tensix:        '#163848',
+    tensixBorder:  '#3A7A8C',
+    tensixActive:  '#4FD1C5',
+    tensixPulse:   '#81E6D9',
+    dram:          '#152035',
+    dramBorder:    '#2D4A6A',
+    eth:           '#221638',
+    ethBorder:     '#5B3DA0',
+    pcie:          '#2A2010',
+    pcieBorder:    '#8B6914',
+    empty:         '#0A1820',
+    text:          '#E8F0F2',
+    textMuted:     '#607D8B',
+    teal:          '#4FD1C5',
+    tealLight:     '#81E6D9',
+    pink:          '#EC96B8',
+    gold:          '#F4C471',
+    green:         '#27AE60',
+    red:           '#FF6B6B',
+    particle:      '#4FD1C5',
+    heatLow:       '#163848',
+    heatMid:       '#F4C471',
+    heatHigh:      '#FF6B6B',
+    heatLowRgb:    [22,  56,  72],
+    heatMidRgb:    [244, 196, 113],
+    heatHighRgb:   [255, 107, 107],
+    nocLine:       'rgba(45,102,117,0.25)',
+    floatLabelBg:  'rgba(13,31,45,0.88)',
+    floatLabelFg:  '#81E6D9',
   };
+
+  // THEME_LIGHT — Cool Slate palette (legible on light-background pages)
+  const THEME_LIGHT = {
+    bg:            '#EEF4F8',
+    grid:          '#B8D4E0',
+    tensix:        '#CCDDE8',
+    tensixBorder:  '#6AACBE',
+    tensixActive:  '#0D9488',
+    tensixPulse:   '#0A7A70',
+    dram:          '#C5D8E8',
+    dramBorder:    '#5A9AB8',
+    eth:           '#C5C5E0',
+    ethBorder:     '#7070B8',
+    pcie:          '#E0D8C8',
+    pcieBorder:    '#A0906A',
+    empty:         '#E4EDF4',
+    text:          '#1A2C38',
+    textMuted:     '#4A6878',
+    teal:          '#0D9488',
+    tealLight:     '#0A7A70',
+    pink:          '#B01060',
+    gold:          '#B45309',
+    green:         '#15803D',
+    red:           '#DC2626',
+    particle:      '#0D9488',
+    heatLow:       '#CCDDE8',
+    heatMid:       '#D97706',
+    heatHigh:      '#DC2626',
+    heatLowRgb:    [204, 221, 232],
+    heatMidRgb:    [217, 119,   6],
+    heatHighRgb:   [220,  38,  38],
+    nocLine:       'rgba(70,140,160,0.35)',
+    floatLabelBg:  'rgba(238,244,248,0.92)',
+    floatLabelFg:  '#0A4A58',
+  };
+
+  // Backward alias — removed in Task 4 once all THEME references are updated
+  const THEME = THEME_DARK;
 
   // ─── TensixViz class ───────────────────────────────────────────────────────
   function TensixViz(canvas, opts) {
@@ -120,6 +165,23 @@
     this._computeLayout();
     this.render();
   }
+
+  // ─── Theme resolution ──────────────────────────────────────────────────────
+  // Walk up the DOM from the canvas to find the active theme class.
+  // Returns THEME_DARK (default) or THEME_LIGHT.
+  TensixViz.prototype._resolveTheme = function () {
+    var node = this.canvas.parentElement;
+    while (node) {
+      if (node.classList && node.classList.contains('tv-light')) return THEME_LIGHT;
+      if (node.classList && node.classList.contains('tv-auto')) {
+        return (typeof window !== 'undefined' && window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: light)').matches)
+          ? THEME_LIGHT : THEME_DARK;
+      }
+      node = node.parentElement;
+    }
+    return THEME_DARK;
+  };
 
   TensixViz.prototype._computeLayout = function () {
     const chip = this.chip;
