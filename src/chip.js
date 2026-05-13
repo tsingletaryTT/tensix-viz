@@ -755,6 +755,16 @@
       for (var c = 0; c < W; c++) prev[r][c] = 0;
     }
 
+    // ── Kernel dispatch state — used only by the kernel_dispatch mode ──────────
+    // Maintained in the activate() closure so it resets cleanly on each activate() call.
+    // Each entry: { c, r, w, h, age, maxAge, seed }
+    //   c/r      — top-left corner of the kernel's compute grid (0-based)
+    //   w/h      — width/height of the kernel grid in cores
+    //   age      — frames elapsed since dispatch
+    //   maxAge   — total lifetime before the kernel is culled
+    //   seed     — per-kernel random seed for stable per-core activity noise
+    var _kd = { list: [], nextDispatch: 5 };
+
     var MODES = {
       idle: function (c, r) {
         return Math.min(1, prev[r][c] * 0.90 + (Math.random() < 0.03 ? Math.random() * 0.35 : 0));
@@ -806,6 +816,78 @@
         var w2 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.33) % 1) * W) / 2) * 0.85;
         var w3 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.66) % 1) * W) / 2) * 0.85;
         return Math.max(w1, w2, w3);
+      },
+      kernel_dispatch: function (c, r) {
+        // Metalium kernel dispatch — programs are launched onto rectangular Tensix
+        // core grids via NOC multicast from the dispatch core.  Each kernel "lights
+        // up" its assigned rectangle with a ripple that propagates from the
+        // top-left corner (dispatch origin), holds while the kernel executes, then
+        // fades out.  Multiple kernels can be in flight simultaneously, matching
+        // the Metalium programming model where independent programs run on disjoint
+        // (or overlapping) grid regions.
+        //
+        // Per-core activation noise uses a deterministic formula (c, r, seed) so
+        // the pattern stays visually stable across frames rather than flickering.
+
+        // Advance kernel state exactly once per frame (on the first cell c=0, r=0).
+        if (c === 0 && r === 0) {
+          // Age existing kernels and cull expired ones (iterate backwards so splice is safe).
+          for (var i = _kd.list.length - 1; i >= 0; i--) {
+            _kd.list[i].age++;
+            if (_kd.list[i].age >= _kd.list[i].maxAge) _kd.list.splice(i, 1);
+          }
+
+          // Dispatch new kernel(s) when the countdown fires.
+          if (--_kd.nextDispatch <= 0) {
+            // Kernel grid dimensions — constrained to realistic sizes
+            // (Metalium grids are typically 1–N cores per axis up to chip width).
+            var kw = 1 + Math.floor(Math.random() * Math.min(8, W - 1));
+            var kh = 1 + Math.floor(Math.random() * Math.min(6, H - 1));
+            var kc = Math.floor(Math.random() * (W - kw));
+            var kr = Math.floor(Math.random() * (H - kh));
+            _kd.list.push({ c: kc, r: kr, w: kw, h: kh,
+                            age: 0, maxAge: 38 + Math.floor(Math.random() * 50),
+                            seed: Math.random() * 100 });
+
+            // 40 % chance a second kernel co-dispatches in the same "program"
+            // (common in Metalium: matmul op = reader + compute + writer kernels)
+            if (Math.random() < 0.4) {
+              kw = 1 + Math.floor(Math.random() * Math.min(6, W - 1));
+              kh = 1 + Math.floor(Math.random() * Math.min(4, H - 1));
+              kc = Math.floor(Math.random() * (W - kw));
+              kr = Math.floor(Math.random() * (H - kh));
+              _kd.list.push({ c: kc, r: kr, w: kw, h: kh,
+                              age: 0, maxAge: 38 + Math.floor(Math.random() * 50),
+                              seed: Math.random() * 100 });
+            }
+
+            _kd.nextDispatch = 18 + Math.floor(Math.random() * 28);
+          }
+        }
+
+        // Compute activation level for this core by checking every active kernel.
+        var val = 0;
+        for (var i = 0; i < _kd.list.length; i++) {
+          var k = _kd.list[i];
+          if (c < k.c || c >= k.c + k.w || r < k.r || r >= k.r + k.h) continue;
+
+          // NOC multicast ripple: distance from dispatch origin (top-left corner).
+          // Each hop ~1.5 frames to propagate — smaller grids fully lit in ~10 frames.
+          var dist        = (c - k.c) + (r - k.r);           // Manhattan from top-left
+          var effectiveAge = k.age - dist * 1.5;
+          if (effectiveAge < 0) continue;                     // not yet reached this core
+
+          // Fade in over 4 frames, sustain, fade out over 10 frames before expiry.
+          var fadeIn  = Math.min(1, effectiveAge / 4);
+          var fadeOut = Math.min(1, (k.maxAge - k.age) / 10);
+
+          // Stable per-core activity variation using a deterministic sinusoidal noise
+          // (avoids per-frame random() flicker while still giving texture).
+          var noise = 0.72 + 0.28 * Math.sin(c * 7.3 + r * 4.1 + k.seed + t * 6);
+
+          val = Math.max(val, fadeIn * fadeOut * noise * 0.88);
+        }
+        return val;
       },
     };
 

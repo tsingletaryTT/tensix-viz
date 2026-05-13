@@ -3,6 +3,16 @@
 Tenstorrent hardware topology visualizer. Single-file, zero-dependency Canvas renderer
 from a single Tensix chip up to a Galaxy SuperCluster.
 
+## Preview
+
+| Chip (BH, thinking) | Card (P300c, inference) | System (QB2, agents) |
+|---|---|---|
+| ![chip](docs/assets/chip.gif) | ![card](docs/assets/card.gif) | ![system](docs/assets/system.gif) |
+
+| Cluster (Galaxy BH, explore) | Themes (dark + light) | Kernel dispatch |
+|---|---|---|
+| ![cluster](docs/assets/cluster.gif) | ![themes](docs/assets/themes.gif) | ![kernel](docs/assets/kernel.gif) |
+
 ## Quick Start
 
 **CDN (no install):**
@@ -91,6 +101,7 @@ Nine modes are available. All are **visual metaphors** — they suggest the conc
 | `prefill` ◆ | Wide fast-moving band | Parallel prompt ingestion | **Close to accurate** — prefill is genuinely compute-bound and uses all cores simultaneously |
 | `video` | Two phase-offset rings | Temporal video frame denoising | 3D DiT (Wan, SkyReels) = transformer layers, not rings; same as `thinking` in practice |
 | `batch` ◆ | Three concurrent sweeps | Parallel batched decode | Reasonable abstraction — batched inference does run multiple sequences through the same compute |
+| `kernel_dispatch` ◆ | Rectangle of cores lights up via ripple from dispatch origin | Metalium kernel launch: program compiled → NOC multicast to assigned core grid | **Close to accurate** — Metalium dispatches kernels to rectangular Tensix core grids via NOC multicast; multiple kernels can run concurrently on disjoint grids |
 
 For live per-core utilisation data, see [tt-toplike](https://github.com/tenstorrent/tt-toplike).
 
