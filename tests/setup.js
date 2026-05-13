@@ -31,13 +31,16 @@ class MockCanvasElement {
     this.classList = makeClassList()
     this.innerHTML = ''
     this._children = []
+    // parentElement is null until this node is appended into another element;
+    // used by _resolveTheme() to walk up the DOM tree for theme classes.
+    this.parentElement = null
   }
   get width()  { return this._w }
   set width(v) { this._w = Number(v) }
   get height()  { return this._h }
   set height(v) { this._h = Number(v) }
   getContext() { return makeMockContext() }
-  appendChild(child) { this._children.push(child); return child }
+  appendChild(child) { this._children.push(child); child.parentElement = this; return child }
   querySelectorAll() { return [] }
   querySelector() { return null }
   get children() { return this._children }
@@ -57,8 +60,11 @@ class MockElement {
     this.dataset = {}
     this.classList = makeClassList()
     this.innerHTML = ''
+    // parentElement is null until this node is appended into another element;
+    // used by _resolveTheme() to walk up the DOM tree for theme classes.
+    this.parentElement = null
   }
-  appendChild(child) { this._children.push(child); return child }
+  appendChild(child) { this._children.push(child); child.parentElement = this; return child }
   insertBefore(newChild, ref) {
     const idx = ref ? this._children.indexOf(ref) : -1
     if (idx === -1) this._children.push(newChild)
@@ -114,4 +120,7 @@ globalThis.window = {
   SystemViz: undefined, ClusterViz: undefined,
   addEventListener: () => {},
   removeEventListener: () => {},
+  // Stub for _resolveTheme(): returns a MediaQueryList-shaped object that always
+  // reports no match so tests run in a deterministic "no OS dark-mode" state.
+  matchMedia: (query) => ({ matches: false }),
 }
