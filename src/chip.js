@@ -114,9 +114,6 @@
     floatLabelFg:  '#0A4A58',
   };
 
-  // Backward alias — removed in Task 4 once all THEME references are updated
-  const THEME = THEME_DARK;
-
   // ─── TensixViz class ───────────────────────────────────────────────────────
   function TensixViz(canvas, opts) {
     opts = opts || {};
@@ -198,6 +195,7 @@
   // ─── Rendering ─────────────────────────────────────────────────────────────
 
   TensixViz.prototype.render = function () {
+    this._theme = this._resolveTheme();  // cache for this render call
     const ctx  = this.ctx;
     const chip = this.chip;
     const lw   = this._logicalW;
@@ -205,7 +203,7 @@
     ctx.clearRect(0, 0, lw, lh);
 
     // Background
-    ctx.fillStyle = THEME.bg;
+    ctx.fillStyle = this._theme.bg;
     ctx.fillRect(0, 0, lw, lh);
 
     // Draw each core cell
@@ -258,9 +256,10 @@
     const ctx  = this.ctx;
     const type = this.chip.coreType(col, row);
     const r    = this._cellRect(col, row);
+    const T    = this._theme;
 
-    let fill   = THEME[type]       || THEME.empty;
-    let border = THEME[type + 'Border'] || fill;
+    let fill   = T[type]       || T.empty;
+    let border = T[type + 'Border'] || fill;
 
     ctx.fillStyle = fill;
     this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
@@ -273,7 +272,7 @@
 
     // Core type indicator (tiny label for non-tensix)
     if (type !== 'tensix' && type !== 'empty' && r.w > 14) {
-      ctx.fillStyle = THEME.textMuted;
+      ctx.fillStyle = T.textMuted;
       ctx.font = `bold ${Math.max(7, r.w * 0.3)}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -287,7 +286,7 @@
     const chip = this.chip;
     const cg   = chip.computeGrid;
 
-    ctx.strokeStyle = 'rgba(45,102,117,0.25)';
+    ctx.strokeStyle = this._theme.nocLine;
     ctx.lineWidth   = 0.5;
     ctx.setLineDash([2, 4]);
 
@@ -314,12 +313,13 @@
     const ctx   = this.ctx;
     const r     = this._cellRect(col, row);
     const alpha = hl.alpha !== undefined ? hl.alpha : 1;
+    const T     = this._theme;
 
     ctx.save();
     ctx.globalAlpha = alpha;
 
-    const color  = THEME[hl.color] || hl.color || THEME.tensixActive;
-    const bright = hl.color === 'pink' ? THEME.pink : THEME.tensixPulse;
+    const color  = T[hl.color] || hl.color || T.tensixActive;
+    const bright = hl.color === 'pink' ? T.pink : T.tensixPulse;
 
     // Fill
     ctx.fillStyle = color;
@@ -342,7 +342,7 @@
 
     ctx.save();
     ctx.font      = `bold ${Math.max(7, r.w * 0.28)}px sans-serif`;
-    ctx.fillStyle = THEME.text;
+    ctx.fillStyle = this._theme.text;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0,0,0,0.8)';
@@ -353,7 +353,7 @@
 
   TensixViz.prototype._drawParticle = function (p) {
     const ctx   = this.ctx;
-    const color = p.color || THEME.particle;
+    const color = p.color || this._theme.particle;
     const r     = p.radius || 4;
     ctx.save();
     // Outer halo (translucent, larger)
@@ -390,7 +390,7 @@
       for (let col = cg.colStart; col <= cg.colEnd; col++) {
         const v    = ((this._heatmap[row] || [])[col] || 0) / maxVal;
         const r    = this._cellRect(col, row);
-        const color = this._heatColor(v);
+        const color = this._heatColor(v, this._theme);
         ctx.save();
         ctx.globalAlpha = 0.6;
         ctx.fillStyle   = color;
@@ -401,13 +401,13 @@
     }
   };
 
-  TensixViz.prototype._heatColor = function (t) {
-    // 0 → cool (teal), 0.5 → warm (gold), 1 → hot (red)
+  TensixViz.prototype._heatColor = function (t, T) {
+    // 0 → cool, 0.5 → warm, 1 → hot
     function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
-    function hex(r, g, b) { return `rgb(${r},${g},${b})`; }
-    const low  = [30,  74, 88];  // THEME.heatLow  ≈ #1E4A58
-    const mid  = [244,196,113];  // THEME.heatMid  ≈ #F4C471
-    const high = [255,107,107];  // THEME.heatHigh ≈ #FF6B6B
+    function hex(r, g, b) { return 'rgb(' + r + ',' + g + ',' + b + ')'; }
+    const low  = T.heatLowRgb;
+    const mid  = T.heatMidRgb;
+    const high = T.heatHighRgb;
     if (t < 0.5) {
       const s = t * 2;
       return hex(lerp(low[0], mid[0], s), lerp(low[1], mid[1], s), lerp(low[2], mid[2], s));
@@ -434,12 +434,13 @@
   // ─── Legend ────────────────────────────────────────────────────────────────
 
   TensixViz.prototype.renderLegend = function (legendEl) {
+    const T = this._resolveTheme();
     const items = [
-      { color: THEME.tensixActive, label: 'Active compute core' },
-      { color: THEME.tensix,       label: 'Idle Tensix core' },
-      { color: THEME.dramBorder,   label: 'DRAM controller' },
-      { color: THEME.ethBorder,    label: 'Ethernet link' },
-      { color: THEME.particle,     label: 'Data tile (NOC transfer)' },
+      { color: T.tensixActive, label: 'Active compute core' },
+      { color: T.tensix,       label: 'Idle Tensix core' },
+      { color: T.dramBorder,   label: 'DRAM controller' },
+      { color: T.ethBorder,    label: 'Ethernet link' },
+      { color: T.particle,     label: 'Data tile (NOC transfer)' },
     ];
     legendEl.innerHTML = items.map(i =>
       `<span class="tv-legend-item">
@@ -648,7 +649,8 @@
     const self  = this;
     const from  = step.from;
     const to    = step.to;
-    const color = THEME[step.color] || THEME.particle;
+    const T     = this._resolveTheme();
+    const color = T[step.color] || T.particle;
     const ms    = (step.ms || 800) / self.speed;
 
     const start = performance.now();
@@ -867,12 +869,13 @@
       ctx.font   = 'bold 11px sans-serif';
       const w    = ctx.measureText(text).width + pad * 2;
       const h    = 18;
-      ctx.fillStyle   = 'rgba(15,42,53,0.88)';
-      ctx.strokeStyle = THEME.teal;
+      const T = this._theme;   // set by _origRender → render() → _resolveTheme()
+      ctx.fillStyle   = T.floatLabelBg;
+      ctx.strokeStyle = T.teal;
       ctx.lineWidth   = 1;
       this._roundRect(ctx, cx - w / 2, cy - h / 2, w, h, 4);
       ctx.fill(); ctx.stroke();
-      ctx.fillStyle    = THEME.tealLight;
+      ctx.fillStyle    = T.floatLabelFg;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, cx, cy);
