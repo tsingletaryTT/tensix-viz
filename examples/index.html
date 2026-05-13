@@ -210,8 +210,16 @@ await viz.transitionTo('system')               // zoom back out</pre>
   </div><!-- end page-body -->
   <script>
   function setTheme(mode) {
-    // Apply theme class to every widget container
-    document.querySelectorAll('[data-viz], .tensix-viz-container').forEach(function(el) {
+    // Apply theme class to every widget container — include direct canvases too,
+    // since TensixViz mounts onto a <canvas> whose parent is .demo-card (not a
+    // named container with data-viz or .tensix-viz-container).
+    var targets = Array.from(document.querySelectorAll('[data-viz], .tensix-viz-container, canvas'))
+    // For canvases, apply to the parent element (the canvas itself is not the
+    // theming hook — _resolveTheme() walks parentElement until it finds tv-light).
+    targets = targets.map(function(el) { return el.tagName === 'CANVAS' ? (el.parentElement || el) : el })
+    // Deduplicate in case a parent already appeared via data-viz/.tensix-viz-container.
+    targets = targets.filter(function(el, i, a) { return a.indexOf(el) === i })
+    targets.forEach(function(el) {
       el.classList.remove('tv-light', 'tv-auto')
       if (mode === 'light') el.classList.add('tv-light')
       if (mode === 'auto')  el.classList.add('tv-auto')

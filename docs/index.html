@@ -514,7 +514,17 @@ sys.activate(<span class="cg">'batch'</span>)
   <script src="../tensix-viz.js"></script>
   <script>
     function setDocsTheme(mode) {
-      document.querySelectorAll('[data-viz], .tensix-viz-container').forEach(function(el) {
+      // Include canvas elements as theming targets — the hero SystemViz mounts
+      // into a plain <div> with no data-viz attribute, and the anatomy/mode canvases
+      // are bare <canvas> elements whose parents hold no special class either.
+      // _resolveTheme() walks parentElement to find tv-light, so we apply to the
+      // direct parent of each canvas (and keep any data-viz/.tensix-viz-container matches).
+      var targets = Array.from(document.querySelectorAll('[data-viz], .tensix-viz-container, canvas'))
+      // Canvases: apply class to parent rather than the canvas itself.
+      targets = targets.map(function(el) { return el.tagName === 'CANVAS' ? (el.parentElement || el) : el })
+      // Deduplicate.
+      targets = targets.filter(function(el, i, a) { return a.indexOf(el) === i })
+      targets.forEach(function(el) {
         el.classList.remove('tv-light', 'tv-auto')
         if (mode === 'light') el.classList.add('tv-light')
         if (mode === 'auto')  el.classList.add('tv-auto')
