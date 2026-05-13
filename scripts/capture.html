@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../tensix-viz.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { overflow: hidden; background: transparent; }
+    /* Ensure widget fits its content */
+    #widget { display: inline-block; }
+  </style>
+</head>
+<body>
+  <div id="widget"></div>
+
+  <script src="../tensix-viz.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search)
+    const type   = params.get('type')   || 'chip'
+    const config = params.get('config') || 'bh-chip'
+    const mode   = params.get('mode')   || 'thinking'
+    const arch   = params.get('arch')   || 'blackhole'
+    const theme  = params.get('theme')  || ''
+    const w      = parseInt(params.get('w') || 340, 10)
+    const h      = parseInt(params.get('h') || 240, 10)
+
+    const container = document.getElementById('widget')
+    if (theme) container.classList.add(theme)
+
+    if (type === 'chip') {
+      /* ── Single-chip canvas widget ── */
+      const canvas = document.createElement('canvas')
+      canvas.width  = w
+      canvas.height = h
+      container.style.background = '#0B1E28'
+      /* inline-block so the screenshot crops to canvas size exactly */
+      container.style.display = 'inline-block'
+      container.appendChild(canvas)
+      new TensixViz(canvas, { arch }).activate(mode)
+
+    } else if (type === 'card') {
+      /* ── CardViz — 2-chip card ── */
+      /* inline-block so screenshot crops to card content */
+      container.style.display = 'inline-block'
+      const inner = document.createElement('div')
+      container.appendChild(inner)
+      new CardViz(inner, config).activate(mode)
+
+    } else if (type === 'system') {
+      /* ── SystemViz — multi-card system ── */
+      /* min-width on inner prevents tv-card flex-rows from collapsing to
+         single-chip width.  QB2 = 2 × P300c = 2×340 px chips + link + padding ≈ 800px. */
+      container.style.display = 'inline-block'
+      const inner = document.createElement('div')
+      inner.style.minWidth = (params.get('w') || 800) + 'px'
+      container.appendChild(inner)
+      new SystemViz(inner, config).activate(mode)
+
+    } else if (type === 'cluster') {
+      /* ── ClusterViz — server/cluster ── */
+      container.style.display = 'inline-block'
+      const inner = document.createElement('div')
+      inner.style.minWidth = (params.get('w') || 700) + 'px'
+      container.appendChild(inner)
+      new ClusterViz(inner, config).activate(mode)
+
+    } else if (type === 'themes') {
+      /* ── Side-by-side dark / light theme comparison ── */
+      const chipW = w   || 280
+      const chipH = h   || 196
+
+      /* inline-flex: shrinks to content width so screenshot crops to widget, not viewport */
+      container.style.display    = 'inline-flex'
+      container.style.gap        = '16px'
+      container.style.padding    = '16px'
+      container.style.background = '#0B1E28'
+      container.style.alignItems = 'flex-start'
+
+      /* -- Dark (default) -- */
+      const darkSide = document.createElement('div')
+      darkSide.style.display       = 'flex'
+      darkSide.style.flexDirection = 'column'
+      darkSide.style.gap           = '6px'
+
+      const darkLabel = document.createElement('div')
+      darkLabel.textContent         = 'dark (default)'
+      darkLabel.style.fontFamily    = 'monospace'
+      darkLabel.style.fontSize      = '11px'
+      darkLabel.style.color         = '#607d8b'
+      darkSide.appendChild(darkLabel)
+
+      const darkCanvas = document.createElement('canvas')
+      darkCanvas.width  = chipW
+      darkCanvas.height = chipH
+      darkSide.appendChild(darkCanvas)
+      container.appendChild(darkSide)
+
+      const darkViz = new TensixViz(darkCanvas, { arch })
+      darkViz.activate(mode)
+
+      /* -- Light (.tv-light) -- */
+      const lightOuter = document.createElement('div')
+      lightOuter.classList.add('tv-light')
+      lightOuter.style.padding      = '12px'
+      lightOuter.style.borderRadius = '8px'
+      lightOuter.style.background   = 'var(--tv-bg)'
+      lightOuter.style.border       = '1px solid var(--tv-border-subtle)'
+      lightOuter.style.display      = 'flex'
+      lightOuter.style.flexDirection = 'column'
+      lightOuter.style.gap          = '6px'
+
+      const lightLabel = document.createElement('div')
+      lightLabel.textContent      = '.tv-light (Cool Slate)'
+      lightLabel.style.fontFamily = 'monospace'
+      lightLabel.style.fontSize   = '11px'
+      lightLabel.style.color      = 'var(--tv-text-muted)'
+      lightOuter.appendChild(lightLabel)
+
+      const lightCanvas = document.createElement('canvas')
+      lightCanvas.width  = chipW
+      lightCanvas.height = chipH
+      lightOuter.appendChild(lightCanvas)
+      container.appendChild(lightOuter)
+
+      const lightViz = new TensixViz(lightCanvas, { arch })
+      lightViz.activate(mode)
+    }
+
+    /* Signal DOM is ready (animation started) */
+    window.__captureReady = true
+  </script>
+</body>
+</html>

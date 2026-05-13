@@ -57,8 +57,13 @@ SystemViz.prototype._init = function () {
     container.appendChild(wrapper)
     self._cardEls.push(wrapper)
 
-    // Each card gets its own CardViz; callers call activate() explicitly
-    const card = new CardViz(wrapper, cardName)
+    // Give CardViz its own inner div so the tv-card class (flex-direction: row)
+    // it adds doesn't conflict with tv-card-wrapper (flex-direction: column) on
+    // the wrapper. Both classes set flex-direction; whichever appears later in
+    // the stylesheet wins — using a separate element avoids the collision entirely.
+    const cardContainer = document.createElement('div')
+    wrapper.appendChild(cardContainer)
+    const card = new CardViz(cardContainer, cardName)
     self._cards.push(card)
 
     // Insert an inter-card link divider between consecutive cards.
