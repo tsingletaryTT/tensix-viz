@@ -32,6 +32,38 @@ import { TensixViz, CardViz, SystemViz, ClusterViz } from 'tensix-viz'
 <div data-viz="cluster" data-config="bh-galaxy" data-mode="explore"></div>
 ```
 
+## Theming
+
+Three palettes are available. Apply a CSS class to any widget container — the class can sit on the widget element itself or any ancestor, so you can wrap multiple widgets in a single themed div.
+
+| Class | Behavior |
+|---|---|
+| *(none)* | **Dark** — default, backward-compatible |
+| `tv-light` | **Light** — Cool Slate palette, legible on white documentation pages |
+| `tv-auto` | **Auto** — follows OS `prefers-color-scheme` |
+
+```html
+<!-- Default dark — existing embeddings need no changes -->
+<canvas data-viz="chip" data-config="bh-chip"></canvas>
+
+<!-- Force light theme -->
+<div class="tv-light">
+  <canvas data-viz="chip" data-config="bh-chip"></canvas>
+</div>
+
+<!-- Follow OS preference — light on macOS/Windows light mode, dark otherwise -->
+<div class="tv-auto" data-viz="card" data-config="bh-p300c"></div>
+
+<!-- Theme a whole page section at once -->
+<section class="tv-light">
+  <div data-viz="card"    data-config="bh-p300c"></div>
+  <div data-viz="system"  data-config="qb2"></div>
+  <div data-viz="cluster" data-config="bh-galaxy"></div>
+</section>
+```
+
+All four widget classes (TensixViz, CardViz, SystemViz, ClusterViz) respond to these classes. DOM widgets (CardViz, SystemViz, ClusterViz) use CSS custom properties; TensixViz resolves the theme per render frame by walking up the DOM, so theme switches take effect immediately with no extra JavaScript.
+
 ## API
 
 All classes share a common interface:

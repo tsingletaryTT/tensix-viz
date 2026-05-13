@@ -46,15 +46,17 @@
     </div>
   </nav>
   <div class="page-body">
+  <h1>tensix-viz — Examples</h1>
+  <p>All four renderer classes, all nine animation modes, and all three themes. Use the controls to switch modes and palettes live.</p>
+
   <!-- ── Theme toggle ───────────────────────────────────────────────────── -->
-  <div style="margin-bottom:24px;display:flex;align-items:center;gap:12px">
-    <span style="font-size:0.8rem;color:#607d8b">Theme:</span>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:10px 14px;background:#0d1f2d;border:1px solid #1a3c47;border-radius:6px">
+    <span style="font-size:0.78rem;color:#607d8b;margin-right:2px">Page theme:</span>
     <button class="mode-btn active" id="btn-dark"  onclick="setTheme('dark')">Dark</button>
     <button class="mode-btn"        id="btn-light" onclick="setTheme('light')">Light</button>
     <button class="mode-btn"        id="btn-auto"  onclick="setTheme('auto')">Auto (OS)</button>
+    <span style="font-size:0.72rem;color:#3d5a66;margin-left:6px">— applies <code>tv-light</code> / <code>tv-auto</code> to all widgets below</span>
   </div>
-  <h1>tensix-viz — Examples</h1>
-  <p>All four renderer classes and all nine animation modes. Use the buttons to switch modes live.</p>
 
   <!-- ── 1. Single chip ─────────────────────────────────────────────── -->
   <h2>1. TensixViz — Single chip (Blackhole 17×12)</h2>
@@ -155,6 +157,55 @@ await new Promise(r => setTimeout(r, 3000))
 await viz.transitionTo('system')               // zoom back out</pre>
   <button class="mode-btn" onclick="runProgrammaticDemo()">&#9654; Run demo on QB2 above</button>
 
+  <!-- ── 6. Theming ─────────────────────────────────────────────────── -->
+  <h2>6. Theming — dark · light · auto</h2>
+  <p>Add a CSS class to any widget container — or any ancestor element — to change its palette. All four widget types respond. The demos below are <em>fixed</em> to their theme and are not affected by the page-level toggle above.</p>
+
+  <div class="demo-row" style="align-items:flex-start">
+
+    <!-- Dark (default) -->
+    <div>
+      <div style="font-size:0.72rem;color:#607d8b;margin-bottom:6px;font-family:monospace">(none) — dark, default</div>
+      <div class="demo-card theme-demo" id="theme-dark-wrap" style="padding:12px;display:inline-block">
+        <canvas id="theme-chip-dark" width="300" height="210"></canvas>
+      </div>
+      <pre style="margin-top:8px;font-size:0.75rem">&lt;!-- no class needed --&gt;
+&lt;canvas data-viz="chip"
+        data-config="bh-chip"&gt;&lt;/canvas&gt;</pre>
+    </div>
+
+    <!-- Light -->
+    <div>
+      <div style="font-size:0.72rem;color:#607d8b;margin-bottom:6px;font-family:monospace">.tv-light — Cool Slate</div>
+      <div class="tv-light theme-demo" id="theme-light-wrap"
+           style="padding:12px;border-radius:8px;border:1px solid var(--tv-border);background:var(--tv-bg);display:inline-block">
+        <canvas id="theme-chip-light" width="300" height="210"></canvas>
+      </div>
+      <pre style="margin-top:8px;font-size:0.75rem">&lt;div class="tv-light"&gt;
+  &lt;canvas data-viz="chip"
+          data-config="bh-chip"&gt;&lt;/canvas&gt;
+&lt;/div&gt;</pre>
+    </div>
+
+    <!-- Auto -->
+    <div>
+      <div style="font-size:0.72rem;color:#607d8b;margin-bottom:6px;font-family:monospace">.tv-auto — follows OS</div>
+      <div class="tv-auto theme-demo" id="theme-auto-wrap"
+           style="padding:12px;border-radius:8px;border:1px solid var(--tv-border);background:var(--tv-bg);display:inline-block">
+        <canvas id="theme-chip-auto" width="300" height="210"></canvas>
+      </div>
+      <pre style="margin-top:8px;font-size:0.75rem">&lt;div class="tv-auto"&gt;
+  &lt;canvas data-viz="chip"
+          data-config="bh-chip"&gt;&lt;/canvas&gt;
+&lt;/div&gt;
+&lt;!-- light when OS is light,
+     dark otherwise --&gt;</pre>
+    </div>
+
+  </div>
+
+  <p style="font-size:0.82rem">The class can be on the widget itself, a parent, or a page-level wrapper — <code>_resolveTheme()</code> walks up the DOM to find it. Switching a class at runtime takes effect on the next animation frame with no extra JavaScript.</p>
+
   <script src="../tensix-viz.js"></script>
   <script>
     // ── 1. Chip ──
@@ -206,6 +257,14 @@ await viz.transitionTo('system')               // zoom back out</pre>
       await sysQB2.transitionTo('system')
       sysQB2.activate('idle')
     }
+
+    // ── 6. Theming ──
+    const themeChipDark  = new TensixViz(document.getElementById('theme-chip-dark'),  { arch: 'blackhole' })
+    const themeChipLight = new TensixViz(document.getElementById('theme-chip-light'), { arch: 'blackhole' })
+    const themeChipAuto  = new TensixViz(document.getElementById('theme-chip-auto'),  { arch: 'blackhole' })
+    themeChipDark.activate('thinking')
+    themeChipLight.activate('thinking')
+    themeChipAuto.activate('thinking')
   </script>
   </div><!-- end page-body -->
   <script>
@@ -219,6 +278,8 @@ await viz.transitionTo('system')               // zoom back out</pre>
     targets = targets.map(function(el) { return el.tagName === 'CANVAS' ? (el.parentElement || el) : el })
     // Deduplicate in case a parent already appeared via data-viz/.tensix-viz-container.
     targets = targets.filter(function(el, i, a) { return a.indexOf(el) === i })
+    // Skip elements inside fixed-theme demo sections (Section 6).
+    targets = targets.filter(function(el) { return !el.closest('.theme-demo') })
     targets.forEach(function(el) {
       el.classList.remove('tv-light', 'tv-auto')
       if (mode === 'light') el.classList.add('tv-light')
