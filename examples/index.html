@@ -46,6 +46,13 @@
     </div>
   </nav>
   <div class="page-body">
+  <!-- ── Theme toggle ───────────────────────────────────────────────────── -->
+  <div style="margin-bottom:24px;display:flex;align-items:center;gap:12px">
+    <span style="font-size:0.8rem;color:#607d8b">Theme:</span>
+    <button class="mode-btn active" id="btn-dark"  onclick="setTheme('dark')">Dark</button>
+    <button class="mode-btn"        id="btn-light" onclick="setTheme('light')">Light</button>
+    <button class="mode-btn"        id="btn-auto"  onclick="setTheme('auto')">Auto (OS)</button>
+  </div>
   <h1>tensix-viz — Examples</h1>
   <p>All four renderer classes and all nine animation modes. Use the buttons to switch modes live.</p>
 
@@ -201,5 +208,20 @@ await viz.transitionTo('system')               // zoom back out</pre>
     }
   </script>
   </div><!-- end page-body -->
+  <script>
+  function setTheme(mode) {
+    // Apply theme class to every widget container
+    document.querySelectorAll('[data-viz], .tensix-viz-container').forEach(function(el) {
+      el.classList.remove('tv-light', 'tv-auto')
+      if (mode === 'light') el.classList.add('tv-light')
+      if (mode === 'auto')  el.classList.add('tv-auto')
+    })
+    // Update button states
+    document.querySelectorAll('#btn-dark,#btn-light,#btn-auto').forEach(function(b) {
+      b.classList.remove('active')
+    })
+    document.getElementById('btn-' + mode).classList.add('active')
+  }
+  </script>
 </body>
 </html>
