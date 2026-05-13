@@ -442,12 +442,19 @@
       { color: T.ethBorder,    label: 'Ethernet link' },
       { color: T.particle,     label: 'Data tile (NOC transfer)' },
     ];
-    legendEl.innerHTML = items.map(i =>
-      `<span class="tv-legend-item">
-        <span class="tv-legend-dot" style="background:${i.color}"></span>
-        ${i.label}
-      </span>`
-    ).join('');
+    // Build legend DOM with safe DOM API (avoids innerHTML injection risk when
+    // theme values are ever sourced from outside the hard-coded THEME objects).
+    legendEl.replaceChildren ? legendEl.replaceChildren() : (legendEl.innerHTML = '');
+    items.forEach(function (item) {
+      var span = document.createElement('span');
+      span.className = 'tv-legend-item';
+      var dot = document.createElement('span');
+      dot.className = 'tv-legend-dot';
+      dot.style.background = item.color;   // safe: style property, not attribute string
+      span.appendChild(dot);
+      span.appendChild(document.createTextNode(' ' + item.label));
+      legendEl.appendChild(span);
+    });
   };
 
   // ─── Script step execution ─────────────────────────────────────────────────
