@@ -212,8 +212,10 @@ describe('TensixViz memory layer', () => {
   })
 
   it('render() does not throw with showMemory: true and setMemoryStats() override', () => {
-    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
-    viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
+    const canvas = makeCanvas()
+    const viz = new TensixViz(canvas, { arch: 'blackhole', showMemory: true })
+    viz.activate('inference')  // seeds _memPhase so _drawMemoryLayer is not short-circuited
+    viz.setMemoryStats({ dram_bw: 0.7, l1_fill: 0.5 })
     expect(() => viz.render()).not.toThrow()
   })
 

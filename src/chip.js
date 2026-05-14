@@ -387,24 +387,24 @@
   TensixViz.prototype._drawMemoryLayer = function () {
     if (!this._showMemory || !this._memPhase) return;
 
-    var ctx  = this.ctx;
-    var chip = this.chip;
-    var cg   = chip.computeGrid;
-    var T    = this._theme;
-    var isDark = (T === THEME_DARK);
-    var mc   = isDark ? MEM_COLORS.dark : MEM_COLORS.light;
+    const ctx    = this.ctx;
+    const chip   = this.chip;
+    const cg     = chip.computeGrid;
+    const T      = this._theme;
+    const isDark = (T === THEME_DARK);
+    const mc     = isDark ? MEM_COLORS.dark : MEM_COLORS.light;
 
     // ── Resolve effective dram_bw and l1_fill ─────────────────────────────────
-    var mode   = this._currentMode || 'idle';
-    var preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
+    const mode   = this._currentMode || 'idle';
+    const preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
     // _memPhase is guaranteed non-null by the early-exit guard above.
-    var mem    = this._memPhase;
+    const mem    = this._memPhase;
 
     // ── Envelope calculation ──────────────────────────────────────────────────
     // kernel_dispatch: envelope is the decayed DRAM-glow value from the KD state.
     // burst:           cosine wave tracking burstPhase (0 → 1 → 0 per cycle).
     // steady:          gentle sinusoidal breath around 0.85.
-    var env;
+    let env;
     if (preset.burstHz === 'kd') {
       env = mem.kdGlow;
     } else if (preset.burst) {
@@ -413,25 +413,25 @@
       env = 0.85 + 0.15 * Math.sin(mem.phase * Math.PI * 2);
     }
 
-    var dramBw = (this._memOverride && this._memOverride.dram_bw !== undefined)
-                 ? this._memOverride.dram_bw : preset.dram_bw;
-    var l1Fill = (this._memOverride && this._memOverride.l1_fill !== undefined)
-                 ? this._memOverride.l1_fill : preset.l1_fill;
+    const dramBw = (this._memOverride && this._memOverride.dram_bw !== undefined)
+                   ? this._memOverride.dram_bw : preset.dram_bw;
+    const l1Fill = (this._memOverride && this._memOverride.l1_fill !== undefined)
+                   ? this._memOverride.l1_fill : preset.l1_fill;
 
     // ── 1. DRAM row glow ──────────────────────────────────────────────────────
     // Alpha is the raw product of bandwidth and envelope — no clamping — so very
     // low-bandwidth modes produce a near-invisible glow rather than a hard floor.
-    var dramAlpha = dramBw * env * 0.55;
+    const dramAlpha = dramBw * env * 0.55;
     if (dramAlpha > 0.005) {
-      var dc = mc.dram;
+      const dramColor = mc.dram;  // [r, g, b] array — renamed from dc to avoid collision with loop var dc
       ctx.save();
       ctx.globalAlpha = dramAlpha;
-      ctx.fillStyle = 'rgb(' + dc[0] + ',' + dc[1] + ',' + dc[2] + ')';
+      ctx.fillStyle = 'rgb(' + dramColor[0] + ',' + dramColor[1] + ',' + dramColor[2] + ')';
       // Iterate this._dram directly (pre-built in _computeLayout) instead of
       // scanning the full grid on every frame — avoids O(cols*rows) coreType checks.
-      for (var di = 0; di < this._dram.length; di++) {
-        var dc2 = this._dram[di];
-        var r = this._cellRect(dc2.col, dc2.row);
+      for (let di = 0; di < this._dram.length; di++) {
+        const dc = this._dram[di];  // renamed from dc2 now that dc (color) is dramColor
+        const r = this._cellRect(dc.col, dc.row);
         this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
         ctx.fill();
       }
@@ -441,15 +441,15 @@
     // ── 2. Spawn transfer particles (DRAM→L1 reads and L1→DRAM writebacks) ───
     // Guard: only spawn when both cell lists are populated (no-op if topology has
     // no DRAM or no compute cells, which should never happen in practice).
-    var spawnRate = dramBw * env;
+    const spawnRate = dramBw * env;
     if (spawnRate > 0 && this._compute.length > 0 && this._dram.length > 0) {
       // Load particle: DRAM → compute (read direction)
       if (Math.random() < spawnRate * 0.3) {
-        var fromCell  = this._dram[Math.floor(Math.random() * this._dram.length)];
-        var toCell    = this._compute[Math.floor(Math.random() * this._compute.length)];
-        var fromRect  = this._cellRect(fromCell.col, fromCell.row);
-        var toRect    = this._cellRect(toCell.col, toCell.row);
-        var loadColorArr = mc[preset.loadColor] || mc.load;
+        const fromCell     = this._dram[Math.floor(Math.random() * this._dram.length)];
+        const toCell       = this._compute[Math.floor(Math.random() * this._compute.length)];
+        const fromRect     = this._cellRect(fromCell.col, fromCell.row);
+        const toRect       = this._cellRect(toCell.col, toCell.row);
+        const loadColorArr = mc[preset.loadColor] || mc.load;
         this._particles.push({
           x:        fromRect.x + fromRect.w / 2,
           y:        fromRect.y + fromRect.h / 2,
@@ -460,18 +460,18 @@
           progress: 0,
           speed:    0.008 + Math.random() * 0.012,
           color:    'rgb(' + loadColorArr[0] + ',' + loadColorArr[1] + ',' + loadColorArr[2] + ')',
-          size:     1.5,
+          radius:   1.5,
           alpha:    0.8,
           _isMem:   true,
         });
       }
       // Writeback particle: compute → DRAM (write direction), separate probability roll.
       if (preset.writeback > 0 && Math.random() < preset.writeback * spawnRate * 0.15) {
-        var wbFrom = this._compute[Math.floor(Math.random() * this._compute.length)];
-        var wbTo   = this._dram[Math.floor(Math.random() * this._dram.length)];
-        var wbFromRect = this._cellRect(wbFrom.col, wbFrom.row);
-        var wbToRect   = this._cellRect(wbTo.col,   wbTo.row);
-        var writeColorArr = mc.write;
+        const wbFrom       = this._compute[Math.floor(Math.random() * this._compute.length)];
+        const wbTo         = this._dram[Math.floor(Math.random() * this._dram.length)];
+        const wbFromRect   = this._cellRect(wbFrom.col, wbFrom.row);
+        const wbToRect     = this._cellRect(wbTo.col,   wbTo.row);
+        const writeColorArr = mc.write;
         this._particles.push({
           x:        wbFromRect.x + wbFromRect.w / 2,
           y:        wbFromRect.y + wbFromRect.h / 2,
@@ -482,7 +482,7 @@
           progress: 0,
           speed:    0.008 + Math.random() * 0.012,
           color:    'rgb(' + writeColorArr[0] + ',' + writeColorArr[1] + ',' + writeColorArr[2] + ')',
-          size:     1.5,
+          radius:   1.5,
           alpha:    0.8,
           _isMem:   true,
         });
@@ -490,8 +490,8 @@
     }
 
     // ── Advance memory particles and remove completed ones ────────────────────
-    for (var i = this._particles.length - 1; i >= 0; i--) {
-      var p = this._particles[i];
+    for (let i = this._particles.length - 1; i >= 0; i--) {
+      const p = this._particles[i];
       if (!p._isMem) continue;
       p.progress = Math.min(1, p.progress + p.speed);
       p.x = p.startX + (p.toX - p.startX) * p.progress;
@@ -503,19 +503,19 @@
 
     // ── 3. L1 fill bars ───────────────────────────────────────────────────────
     if (l1Fill > 0.01) {
-      var lc = mc.l1;
+      const lc = mc.l1;
       ctx.save();
+      ctx.globalAlpha = 0.75;  // set once before the loop — avoids repeated property writes
       ctx.fillStyle = 'rgb(' + lc[0] + ',' + lc[1] + ',' + lc[2] + ')';
-      for (var lrow = cg.rowStart; lrow <= cg.rowEnd; lrow++) {
-        for (var lcol = cg.colStart; lcol <= cg.colEnd; lcol++) {
+      for (let lrow = cg.rowStart; lrow <= cg.rowEnd; lrow++) {
+        for (let lcol = cg.colStart; lcol <= cg.colEnd; lcol++) {
           if (chip.coreType(lcol, lrow) !== 'tensix') continue;
-          var cr = this._cellRect(lcol, lrow);
-          var noise  = 1 + 0.15 * Math.sin(lcol * 3.7 + lrow * 2.9 + mem.phase * Math.PI);
-          var fillH  = Math.min(cr.h * 0.9, cr.h * l1Fill * noise);
-          var barW   = cr.w * 0.70;
-          var barX   = cr.x + (cr.w - barW) / 2;
-          var barY   = cr.y + cr.h - fillH;
-          ctx.globalAlpha = 0.75;
+          const cr    = this._cellRect(lcol, lrow);
+          const noise = 1 + 0.15 * Math.sin(lcol * 3.7 + lrow * 2.9 + mem.phase * Math.PI);
+          const fillH = Math.min(cr.h * 0.9, cr.h * l1Fill * noise);
+          const barW  = cr.w * 0.70;
+          const barX  = cr.x + (cr.w - barW) / 2;
+          const barY  = cr.y + cr.h - fillH;
           ctx.fillRect(barX, barY, barW, fillH);
         }
       }
