@@ -197,4 +197,23 @@ describe('TensixViz memory layer', () => {
     expect(viz._memOverride.dram_bw).toBe(1)
     expect(viz._memOverride.l1_fill).toBe(0)
   })
+
+  it('render() does not throw with showMemory: true and no active mode', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    expect(() => viz.render()).not.toThrow()
+  })
+
+  it('render() does not throw with showMemory: true after activate()', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.activate('inference')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(() => viz.render()).not.toThrow()
+    viz.reset()
+  })
+
+  it('render() does not throw with showMemory: true and setMemoryStats() override', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
+    expect(() => viz.render()).not.toThrow()
+  })
 })

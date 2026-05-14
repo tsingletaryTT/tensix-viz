@@ -279,6 +279,9 @@
     // Particles
     this._particles.forEach(p => this._drawParticle(p));
 
+    // Memory visualization layer (opt-in — DRAM glow, transfer streams, L1 bars)
+    this._drawMemoryLayer();
+
     // NOC grid lines (subtle)
     this._drawNocLines();
   };
@@ -353,6 +356,140 @@
     }
 
     ctx.setLineDash([]);
+  };
+
+  // ─── Memory visualization layer ────────────────────────────────────────────
+  // Renders three sub-layers on top of the chip grid when this._showMemory is true:
+  //   1. DRAM row glow  — alpha-tinted overlay on dram-type cells
+  //   2. Transfer particles — read (DRAM→L1) and writeback (L1→DRAM) streams
+  //   3. L1 fill bars  — thin bar at bottom of each tensix compute cell
+  //
+  // Visual values come from MEM_PRESETS[_currentMode] unless _memOverride is set.
+  // Colors follow the resolved theme (dark or light).
+  TensixViz.prototype._drawMemoryLayer = function () {
+    if (!this._showMemory) return;
+
+    var ctx  = this.ctx;
+    var chip = this.chip;
+    var cg   = chip.computeGrid;
+    var T    = this._theme;
+    var isDark = (T === THEME_DARK);
+    var mc   = isDark ? MEM_COLORS.dark : MEM_COLORS.light;
+
+    // ── Resolve effective dram_bw and l1_fill ─────────────────────────────────
+    var mode   = this._currentMode || 'idle';
+    var preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
+    var mem    = this._memPhase || { phase: 0, burstPhase: 0, kdGlow: 0 };
+
+    // Envelope: burst modes pulse on a sin envelope; steady modes use a gentle breath.
+    var env;
+    if (preset.burstHz === 'kd') {
+      env = 0.15 + mem.kdGlow * 0.75;
+    } else if (preset.burst) {
+      env = Math.max(0, Math.cos(mem.burstPhase * Math.PI * 2)) * 0.5 + 0.5;
+    } else {
+      env = 1.0 + 0.12 * Math.sin(mem.phase * Math.PI * 2);
+    }
+
+    var dramBw = (this._memOverride && this._memOverride.dram_bw !== undefined)
+                 ? this._memOverride.dram_bw : preset.dram_bw;
+    var l1Fill = (this._memOverride && this._memOverride.l1_fill !== undefined)
+                 ? this._memOverride.l1_fill : preset.l1_fill;
+
+    // ── 1. DRAM row glow ──────────────────────────────────────────────────────
+    var dramAlpha = Math.min(1, dramBw * env * 0.65);
+    if (dramAlpha > 0.005) {
+      var dc = mc.dram;
+      ctx.save();
+      ctx.globalAlpha = dramAlpha;
+      ctx.fillStyle = 'rgb(' + dc[0] + ',' + dc[1] + ',' + dc[2] + ')';
+      for (var row = 0; row < chip.rows; row++) {
+        for (var col = 0; col < chip.cols; col++) {
+          if (chip.coreType(col, row) === 'dram') {
+            var r = this._cellRect(col, row);
+            this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
+            ctx.fill();
+          }
+        }
+      }
+      ctx.restore();
+    }
+
+    // ── 2. Spawn transfer particles (DRAM→L1 reads and L1→DRAM writebacks) ───
+    // Only spawn when the animation loop has ticked at least once (heatmap present).
+    if (dramBw > 0.05 && this._heatmap) {
+      var spawnChance = dramBw * env * 0.18;
+      if (Math.random() < spawnChance) {
+        var isWriteback = (preset.writeback > 0 && Math.random() < preset.writeback);
+        var colorKey    = isWriteback ? 'write' : (preset.loadColor || 'load');
+        var pColor      = mc[colorKey];
+        var pColorStr   = 'rgb(' + pColor[0] + ',' + pColor[1] + ',' + pColor[2] + ')';
+
+        // Collect DRAM cells to use as particle spawn points
+        var dramCells = [];
+        for (var drow = 0; drow < chip.rows; drow++) {
+          for (var dcol = 0; dcol < chip.cols; dcol++) {
+            if (chip.coreType(dcol, drow) === 'dram') dramCells.push([dcol, drow]);
+          }
+        }
+        var origin  = dramCells[Math.floor(Math.random() * dramCells.length)];
+        var oCenter = this._cellCenter(origin[0], origin[1]);
+
+        var destCol = cg.colStart + Math.floor(Math.random() * (cg.colEnd - cg.colStart + 1));
+        var destRow = cg.rowStart + Math.floor(Math.random() * (cg.rowEnd - cg.rowStart + 1));
+        var dCenter = this._cellCenter(destCol, destRow);
+
+        var from = isWriteback ? dCenter : oCenter;
+        var to   = isWriteback ? oCenter : dCenter;
+
+        this._particles.push({
+          x:        from.x,
+          y:        from.y,
+          startX:   from.x,
+          startY:   from.y,
+          toX:      to.x,
+          toY:      to.y,
+          color:    pColorStr,
+          radius:   Math.max(2, this._cellW * 0.12),
+          progress: 0,
+          speed:    0.035 + Math.random() * 0.025,
+          _isMem:   true,
+        });
+      }
+    }
+
+    // ── Advance memory particles and remove completed ones ────────────────────
+    for (var i = this._particles.length - 1; i >= 0; i--) {
+      var p = this._particles[i];
+      if (!p._isMem) continue;
+      p.progress = Math.min(1, p.progress + p.speed);
+      p.x = p.startX + (p.toX - p.startX) * p.progress;
+      p.y = p.startY + (p.toY - p.startY) * p.progress;
+      if (p.progress >= 1) {
+        this._particles.splice(i, 1);
+      }
+    }
+
+    // ── 3. L1 fill bars ───────────────────────────────────────────────────────
+    if (l1Fill > 0.01) {
+      var lc = mc.l1;
+      ctx.save();
+      ctx.fillStyle = 'rgb(' + lc[0] + ',' + lc[1] + ',' + lc[2] + ')';
+      for (var lrow = cg.rowStart; lrow <= cg.rowEnd; lrow++) {
+        for (var lcol = cg.colStart; lcol <= cg.colEnd; lcol++) {
+          if (chip.coreType(lcol, lrow) !== 'tensix') continue;
+          var cr = this._cellRect(lcol, lrow);
+          var noise  = 1 + 0.15 * Math.sin(lcol * 3.7 + lrow * 2.9 + mem.phase * Math.PI);
+          var fillH  = Math.min(cr.h * 0.9, cr.h * l1Fill * noise);
+          var barW   = cr.w * 0.70;
+          var barX   = cr.x + (cr.w - barW) / 2;
+          var barY   = cr.y + cr.h - fillH;
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(barX, barY, barW, fillH);
+        }
+      }
+      ctx.restore();
+    }
   };
 
   TensixViz.prototype._drawHighlight = function (col, row, hl) {
@@ -841,6 +978,14 @@
       nextDispatch: 1               // dispatch another kernel on the first frame
     };
 
+    // ── Memory layer animation state ─────────────────────────────────────────
+    // Drives smooth per-frame envelopes in _drawMemoryLayer().
+    var _mem = {
+      phase:      0,   // continuously incrementing phase counter
+      burstPhase: 0,   // fractional phase within a burst cycle (0–1)
+      kdGlow:     0,   // current DRAM glow for kernel_dispatch (decays per frame)
+    };
+
     var MODES = {
       idle: function (c, r) {
         return Math.min(1, prev[r][c] * 0.90 + (Math.random() < 0.03 ? Math.random() * 0.35 : 0));
@@ -975,6 +1120,20 @@
     function tick() {
       if (self._animGen !== gen) return;
       t += 0.012;
+
+      // Advance memory animation state (only when memory layer is enabled)
+      if (self._showMemory) {
+        _mem.phase += 0.012;
+        var preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
+        if (preset.burst && preset.burstHz !== 'kd') {
+          _mem.burstPhase = (_mem.burstPhase + preset.burstHz * 0.012) % 1;
+        }
+        if (preset.burstHz === 'kd') {
+          var kdActive = _kd.list.length > 0 ? 1 : 0;
+          _mem.kdGlow = _mem.kdGlow * 0.92 + kdActive * 0.08;
+        }
+        self._memPhase = _mem;
+      }
 
       var next = [];
       var hmap = [];
