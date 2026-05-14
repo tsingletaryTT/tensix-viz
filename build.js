@@ -1,5 +1,6 @@
 // build.js
 import esbuild from 'esbuild'
+import { copyFileSync } from 'fs'
 
 async function build() {
   const shared = {
@@ -33,7 +34,12 @@ async function build() {
     outfile: 'tensix-viz.esm.js',
   })
 
-  console.log('Build complete: tensix-viz.js + tensix-viz.esm.js')
+  // Copy build artifacts + CSS into docs/ so GitHub Pages (served from /docs) stays in sync
+  for (const file of ['tensix-viz.js', 'tensix-viz.esm.js', 'tensix-viz.css']) {
+    copyFileSync(file, `docs/${file}`)
+  }
+
+  console.log('Build complete: tensix-viz.js + tensix-viz.esm.js (copied to docs/)')
 }
 
 build().catch(err => { console.error(err); process.exit(1) })
