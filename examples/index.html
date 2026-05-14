@@ -257,20 +257,6 @@ await viz.transitionTo('system')               // zoom back out</pre>
     themeChipLight.activate('thinking')
     themeChipAuto.activate('thinking')
 
-    // ── 7. Memory visualization ──
-    const memViz = new TensixViz(document.getElementById('mem-chip'), { arch: 'blackhole', showMemory: true })
-    memViz.activate('inference')
-
-    function updateMemSlider(key, val) {
-      const stat = {}
-      stat[key] = parseFloat(val)
-      memViz.setMemoryStats(stat)
-      document.getElementById(key === 'dram_bw' ? 'val-dram' : 'val-l1').textContent = parseFloat(val).toFixed(2)
-    }
-
-    function setMemMode(mode) {
-      memViz.activate(mode)
-    }
   </script>
 
   <!-- ── 7. Memory visualization ─────────────────────────────────────────── -->
@@ -327,6 +313,31 @@ viz.setMemoryStats({ dram_bw: 0.90 })</pre>
   </div>
 
   </div><!-- end page-body -->
+
+  <!-- ── 7. Memory visualization JS ──
+       This script block MUST appear after the <canvas id="mem-chip"> element
+       above so that getElementById('mem-chip') returns a real node at parse
+       time.  The memStats object is kept in local scope so that each slider
+       call sends both keys, preventing setMemoryStats() from wiping the other
+       slider's value on every update (Bug B fix). -->
+  <script>
+    const memStats = { dram_bw: 0.55, l1_fill: 0.45 }
+
+    const memViz = new TensixViz(document.getElementById('mem-chip'), { arch: 'blackhole', showMemory: true })
+    memViz.activate('inference')
+
+    function updateMemSlider(key, val) {
+      const n = parseFloat(val)
+      memStats[key] = n
+      memViz.setMemoryStats(memStats)
+      document.getElementById(key === 'dram_bw' ? 'val-dram' : 'val-l1').textContent = n.toFixed(2)
+    }
+
+    function setMemMode(mode) {
+      memViz.activate(mode)
+    }
+  </script>
+
   <script>
   function setTheme(mode) {
     // Apply theme class to every widget container — include direct canvases too,
