@@ -5,24 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>tensix-viz — Tenstorrent hardware visualizer</title>
   <link rel="stylesheet" href="../tensix-viz.css">
+  <link rel="stylesheet" href="../site.css">
   <style>
-    :root {
-      --bg0:        #080f14;
-      --bg1:        #0d1b24;
-      --card:       #162838;
-      --card2:      #1a3040;
-      --teal:       #4fd1c5;
-      --teal-dim:   #3aada2;
-      --teal-glow:  rgba(79,209,197,.15);
-      --pink:       #ec96b8;
-      --gold:       #f4c471;
-      --green:      #27ae60;
-      --text:       #e8f0f2;
-      --text2:      #b0c4d0;
-      --muted:      #607d8b;
-      --border:     rgba(79,209,197,.18);
-    }
-
     *, *::before, *::after { box-sizing: border-box; }
 
     body {
@@ -32,21 +16,6 @@
       font-family: system-ui, -apple-system, sans-serif;
       line-height: 1.6;
     }
-
-    /* ── Nav ────────────────────────────────────────────────────────────── */
-    nav {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(8,15,20,.92);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 clamp(1.25rem, 5vw, 5rem);
-      display: flex; align-items: center; gap: 2rem;
-      height: 56px;
-    }
-    .nav-title { color: var(--teal); font-weight: 600; font-size: 1rem; text-decoration: none; letter-spacing: -.01em; }
-    .nav-links  { display: flex; gap: 1.5rem; margin-left: auto; }
-    .nav-links a { color: var(--text2); text-decoration: none; font-size: 0.875rem; transition: color .15s; }
-    .nav-links a:hover { color: var(--teal); }
 
     /* ── Sections ───────────────────────────────────────────────────────── */
     section { padding: 5rem 0; }
@@ -217,21 +186,21 @@
       .hero-inner    { grid-template-columns: 1fr; }
       .chip-anatomy  { grid-template-columns: 1fr; }
     }
-    @media (max-width: 640px) {
-      .nav-links { display: none; }
-    }
   </style>
 </head>
 <body>
 
-  <nav>
-    <a class="nav-title" href="#">tensix-viz</a>
-    <div class="nav-links">
+  <nav class="site-nav">
+    <a class="site-nav-brand" href="#">tensix-viz</a>
+    <div class="site-nav-anchors">
       <a href="#grid">The Grid</a>
       <a href="#modes">Animation Modes</a>
       <a href="#api">API</a>
-      <a href="./examples.html">Examples</a>
-      <a href="https://github.com/tsingletaryTT/tensix-viz">GitHub ↗</a>
+    </div>
+    <div class="site-nav-links">
+      <a class="site-nav-link site-nav-link--active" href="#">Docs</a>
+      <a class="site-nav-link" href="../examples/index.html">Examples</a>
+      <a class="site-nav-link" href="https://github.com/tsingletaryTT/tensix-viz" target="_blank">GitHub ↗</a>
     </div>
   </nav>
 
@@ -243,10 +212,10 @@
           <span style="color:var(--teal)">◆</span> Tenstorrent
         </div>
         <h1>Visualize the <span>silicon</span>.</h1>
-        <p>tensix-viz renders Tenstorrent hardware — from a single Tensix core up to a Galaxy SuperCluster — in a zero-dependency Canvas file. Nine animation modes make each workload visible on the chip.</p>
+        <p>tensix-viz renders Tenstorrent hardware — from a single Tensix core up to a Galaxy SuperCluster — in a zero-dependency Canvas file. Ten animation modes make each workload visible on the chip.</p>
         <p style="font-size:0.875rem">Used in <a href="https://docs.tenstorrent.com/systems/quietbox/quietbox-bh-2/welcome.html" style="color:var(--teal);text-decoration:none">QB2 welcome pages</a>, VS Code lessons, and standalone explainers.</p>
         <div class="hero-links">
-          <a class="btn-primary" href="./examples.html">Open examples</a>
+          <a class="btn-primary" href="../examples/index.html">Open examples</a>
           <a class="btn-outline" href="https://github.com/tsingletaryTT/tensix-viz">View on GitHub</a>
         </div>
       </div>
@@ -526,7 +495,7 @@ sys.activate(<span class="cg">'batch'</span>)
     <span class="sep">·</span>
     <a href="https://github.com/tsingletaryTT/tensix-viz">GitHub</a>
     <span class="sep">·</span>
-    <a href="./examples.html">Examples</a>
+    <a href="../examples/index.html">Examples</a>
     <span class="sep">·</span>
     <a href="https://docs.tenstorrent.com/systems/quietbox/quietbox-bh-2/welcome.html">QB2 welcome page</a>
   </footer>
