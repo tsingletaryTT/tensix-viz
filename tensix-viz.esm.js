@@ -4,16 +4,19 @@ var CHIPS = {
     label: "Wormhole (N150/N300)",
     cols: 10,
     rows: 12,
-    // Tensix compute grid sits at rows 1-8, cols 1-8 (0-indexed)
-    // Row 0, Row 9-11 are special; col 0, col 9 are DRAM/ETH
+    // Actual Wormhole NOC grid: 10 cols (x=0..9) × 12 rows (y=0..11).
+    // ETH:    full rows 0 and 6 (10 ETH cores each row, 20 total)
+    // DRAM:   cols 0 and 5 at all non-ETH rows (y=1-5, 7-11 → 20 DRAM cells)
+    // Tensix: cols 1-4 and 6-9 at all non-ETH rows (8 × 10 = 80 compute cores)
     coreType(col, row) {
-      if (row === 0 || row === 9) return "dram";
-      if (col === 0) return "eth";
-      if (col === 9) return row >= 1 && row <= 4 ? "eth" : "dram";
-      if (row >= 1 && row <= 8 && col >= 1 && col <= 8) return "tensix";
-      return "empty";
+      if (row === 0 || row === 6) return "eth";
+      if (col === 0 || col === 5) return "dram";
+      return "tensix";
     },
-    computeGrid: { colStart: 1, colEnd: 8, rowStart: 1, rowEnd: 8 }
+    // Bounding rectangle covering all Tensix/DRAM/ETH within the active grid.
+    // Note: col 5 (DRAM) and row 6 (ETH) fall inside this rectangle — they
+    // render with their correct core-type styling via coreType().
+    computeGrid: { colStart: 1, colEnd: 9, rowStart: 1, rowEnd: 11 }
     // inclusive
   },
   blackhole: {
