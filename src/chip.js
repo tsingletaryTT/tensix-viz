@@ -548,8 +548,9 @@
 
   // ─── Memory stats override ─────────────────────────────────────────────────
   // Call with live bandwidth/fill data to override the simulation preset.
-  // Accepts a partial object — only provided keys are overridden.
-  // Cleared by reset() and activate().
+  // Each call replaces the entire override — unprovided keys fall back to the
+  // mode preset, not to values from a prior call.
+  // Cleared by reset() (called automatically by activate()).
   TensixViz.prototype.setMemoryStats = function (stats) {
     if (!stats || typeof stats !== 'object') return;
     this._memOverride = {};

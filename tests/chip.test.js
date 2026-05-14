@@ -190,4 +190,11 @@ describe('TensixViz memory layer', () => {
     const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
     expect(viz._showMemory).toBe(false)
   })
+
+  it('setMemoryStats() clamps out-of-range values to [0, 1]', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.setMemoryStats({ dram_bw: 1.5, l1_fill: -0.2 })
+    expect(viz._memOverride.dram_bw).toBe(1)
+    expect(viz._memOverride.l1_fill).toBe(0)
+  })
 })
