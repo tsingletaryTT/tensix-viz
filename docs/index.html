@@ -195,6 +195,7 @@
     <div class="site-nav-anchors">
       <a href="#grid">The Grid</a>
       <a href="#modes">Animation Modes</a>
+      <a href="#memory">Memory</a>
       <a href="#api">API</a>
     </div>
     <div class="site-nav-links">
@@ -437,6 +438,40 @@
     </div>
   </section>
 
+  <!-- ── Memory Visualization ───────────────────────────────────────────── -->
+  <section id="memory">
+    <div class="section-inner">
+      <div class="section-label">Memory</div>
+      <h2>DRAM activity &amp; L1 fill overlay</h2>
+      <p>Pass <code>showMemory: true</code> to add a DRAM bandwidth glow around memory rows and per-core L1 fill bars on every Tensix cell. Drive both values from real <code>tt-smi</code> telemetry or let the mode preset animate them.</p>
+
+      <div class="chip-anatomy">
+        <div>
+          <canvas id="mem-hero" width="340" height="240"></canvas>
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;margin-bottom:0">Blackhole · batch mode · <code>showMemory: true</code></p>
+        </div>
+        <div>
+          <p style="margin-top:0">The overlay composites on top of any animation mode. DRAM rows pulse brighter as bandwidth rises; each Tensix cell grows a slim bar tracking L1 SRAM utilization. Values animate smoothly between updates and can be set independently — only the keys you provide are overridden.</p>
+          <pre><code><span class="ct">const</span> viz = <span class="ct">new</span> TensixViz(canvas, {
+  arch: <span class="cg">'blackhole'</span>,
+  showMemory: <span class="ct">true</span>       <span class="cm">// enable DRAM glow + L1 bars</span>
+})
+viz.activate(<span class="cg">'batch'</span>)
+
+<span class="cm">// override with live tt-smi data</span>
+viz.setMemoryStats({
+  dram_bw: <span class="cg">0.82</span>,  <span class="cm">// 0–1  (1.0 ≈ 900 GB/s peak on BH)</span>
+  l1_fill: <span class="cg">0.61</span>   <span class="cm">// 0–1  (fraction of 108 KB L1 in use)</span>
+})
+
+<span class="cm">// partial override — only dram_bw changes; l1_fill stays on preset</span>
+viz.setMemoryStats({ dram_bw: <span class="cg">0.95</span> })</code></pre>
+          <p style="font-size:0.8rem;color:var(--muted)">Works on all architectures and all ten animation modes. Values are cleared when <code>activate()</code> is called and can be re-applied immediately after.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── API Quick Start ─────────────────────────────────────────────────── -->
   <section id="api">
     <div class="section-inner">
@@ -537,6 +572,10 @@ sys.activate(<span class="cg">'batch'</span>)
       const viz = new TensixViz(canvas, { arch: 'blackhole' })
       viz.activate(mode)
     })
+
+    // Memory section — DRAM glow + L1 fill overlay, batch mode (memory-bandwidth-bound)
+    const memHero = new TensixViz(document.getElementById('mem-hero'), { arch: 'blackhole', showMemory: true })
+    memHero.activate('batch')
   </script>
 </body>
 </html>
