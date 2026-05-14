@@ -156,4 +156,38 @@ describe('TensixViz memory layer', () => {
   it('constructs with showMemory: true without throwing', () => {
     expect(() => new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })).not.toThrow()
   })
+
+  it('setMemoryStats() stores override values', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
+    expect(viz._memOverride.dram_bw).toBe(0.75)
+    expect(viz._memOverride.l1_fill).toBe(0.60)
+  })
+
+  it('setMemoryStats() supports partial override (only dram_bw)', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.setMemoryStats({ dram_bw: 0.80 })
+    expect(viz._memOverride.dram_bw).toBe(0.80)
+    expect(viz._memOverride.l1_fill).toBeUndefined()
+  })
+
+  it('reset() clears _memOverride', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
+    viz.reset()
+    expect(viz._memOverride).toBeNull()
+  })
+
+  it('activate() clears _memOverride', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })
+    viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
+    viz.activate('inference')
+    expect(viz._memOverride).toBeNull()
+    viz.reset()
+  })
+
+  it('showMemory defaults to false — _showMemory is false when omitted', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    expect(viz._showMemory).toBe(false)
+  })
 })

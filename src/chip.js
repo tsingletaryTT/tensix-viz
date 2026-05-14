@@ -180,6 +180,9 @@
     this._floatLabelData = null;  // floating label data, cleared by reset() and unhighlight
     this._loop           = false; // whether activate/play should loop on completion
     this._loopScript     = null;  // script to replay when _loop is true
+    this._showMemory  = !!(opts.showMemory);  // true → render memory layer each frame
+    this._memOverride = null;                  // set by setMemoryStats(); null = use preset
+    this._currentMode = null;                  // set by activate(); used by _drawMemoryLayer
 
     this._cellW = 0;
     this._cellH = 0;
@@ -536,9 +539,22 @@
     this._heatmap       = null;
     this._labels        = {};
     this._floatLabelData = null;
+    this._memOverride = null;
+    this._currentMode = null;
     this._scriptQueue   = [];
     this._resolveStep   = null;
     this.render();
+  };
+
+  // ─── Memory stats override ─────────────────────────────────────────────────
+  // Call with live bandwidth/fill data to override the simulation preset.
+  // Accepts a partial object — only provided keys are overridden.
+  // Cleared by reset() and activate().
+  TensixViz.prototype.setMemoryStats = function (stats) {
+    if (!stats || typeof stats !== 'object') return;
+    this._memOverride = {};
+    if (typeof stats.dram_bw === 'number') this._memOverride.dram_bw = Math.max(0, Math.min(1, stats.dram_bw));
+    if (typeof stats.l1_fill === 'number') this._memOverride.l1_fill = Math.max(0, Math.min(1, stats.l1_fill));
   };
 
   TensixViz.prototype._runLoop = function () {
@@ -780,6 +796,7 @@
 
   TensixViz.prototype.activate = function (mode, opts) {
     this.reset();                                // stop any existing animation
+    this._currentMode = mode;
     opts = opts || {};
 
     var chip = this.chip;
