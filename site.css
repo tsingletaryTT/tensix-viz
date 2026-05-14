@@ -1,0 +1,60 @@
+/* ── Site-wide design tokens ───────────────────────────────────────────────
+   Shared between docs/index.html and examples/index.html.
+   Link as: <link rel="stylesheet" href="../site.css">                      */
+
+:root {
+  --bg0:        #080f14;
+  --bg1:        #0d1b24;
+  --card:       #162838;
+  --card2:      #1a3040;
+  --teal:       #4fd1c5;
+  --teal-dim:   #3aada2;
+  --teal-glow:  rgba(79,209,197,.15);
+  --pink:       #ec96b8;
+  --gold:       #f4c471;
+  --green:      #27ae60;
+  --text:       #e8f0f2;
+  --text2:      #b0c4d0;
+  --muted:      #607d8b;
+  --border:     rgba(79,209,197,.18);
+}
+
+/* ── Shared nav ─────────────────────────────────────────────────────────── */
+.site-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,15,20,.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 clamp(1.25rem, 5vw, 5rem);
+  display: flex; align-items: center; gap: 2rem;
+  height: 56px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.site-nav-brand {
+  color: var(--teal); font-weight: 600; font-size: 1rem;
+  text-decoration: none; letter-spacing: -.01em;
+}
+.site-nav-anchors {
+  display: flex; gap: 1.5rem;
+}
+.site-nav-anchors a {
+  color: var(--text2); text-decoration: none; font-size: 0.875rem;
+  transition: color .15s;
+}
+.site-nav-anchors a:hover { color: var(--teal); }
+.site-nav-links {
+  display: flex; gap: 1.5rem; margin-left: auto;
+}
+.site-nav-link {
+  color: var(--text2); text-decoration: none; font-size: 0.875rem;
+  transition: color .15s;
+}
+.site-nav-link:hover { color: var(--teal); }
+.site-nav-link--active {
+  color: var(--teal); font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .site-nav-anchors { display: none; }
+  .site-nav-links   { gap: 1rem; }
+}
