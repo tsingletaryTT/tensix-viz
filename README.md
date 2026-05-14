@@ -13,6 +13,10 @@ from a single Tensix chip up to a Galaxy SuperCluster.
 |---|---|---|
 | ![cluster](docs/assets/cluster.gif) | ![themes](docs/assets/themes.gif) | ![kernel](docs/assets/kernel.gif) |
 
+| Memory layer (BH, inference) | | |
+|---|---|---|
+| ![memory](docs/assets/memory.gif) | | |
+
 ## Quick Start
 
 **CDN (no install):**
@@ -90,26 +94,28 @@ All classes share a common interface:
 
 Nine modes are available. All are **visual metaphors** — they suggest the conceptual nature of a workload, not a physically accurate trace of core activation. Real Tenstorrent workloads are dominated by matmuls that keep most or all Tensix cores busy simultaneously regardless of workload type. Modes marked ◆ most closely match what `tt-toplike` would actually show.
 
-| Mode | Pattern | Represents | Hardware reality |
-|------|---------|------------|-----------------|
-| `idle` | Quiet random shimmer | Background system activity | ARC firmware + DDR refresh; compute cores mostly clock-gated |
-| `inference` | Column sweep L→R | Sequential token generation | Matmul tiles distributed across full mesh; batch=1 decode is memory-BW-bound |
-| `diffusion` | Expanding ring from center | Image denoising timestep | DiT/U-Net = transformer forward passes, same pattern as inference |
-| `agents` | Random burst clusters | Async tool-call dispatch | Sustained compute-bound utilisation; "clusters" are logical, not physical |
-| `explore` | Sinusoidal wave | Particle Life physics field | Custom RISC-V kernels do distribute spatially — closest to spatial truth for Metalium workloads |
-| `thinking` ◆ | Sustained full-grid glow | Extended reasoning / CoT | **Most accurate** — long CoT inference is sustained high matmul utilisation across all cores |
-| `prefill` ◆ | Wide fast-moving band | Parallel prompt ingestion | **Close to accurate** — prefill is genuinely compute-bound and uses all cores simultaneously |
-| `video` | Two phase-offset rings | Temporal video frame denoising | 3D DiT (Wan, SkyReels) = transformer layers, not rings; same as `thinking` in practice |
-| `batch` ◆ | Three concurrent sweeps | Parallel batched decode | Reasonable abstraction — batched inference does run multiple sequences through the same compute |
-| `kernel_dispatch` ◆ | Rectangle of cores lights up via ripple from dispatch origin | Metalium kernel launch: program compiled → NOC multicast to assigned core grid | **Close to accurate** — Metalium dispatches kernels to rectangular Tensix core grids via NOC multicast; multiple kernels can run concurrently on disjoint grids |
+| Mode | Pattern | Represents | Hardware reality | DRAM signature (`showMemory`) |
+|------|---------|------------|-----------------|-------------------------------|
+| `idle` | Quiet random shimmer | Background system activity | ARC firmware + DDR refresh; compute cores mostly clock-gated | 0.05 — near-silent |
+| `inference` | Column sweep L→R | Sequential token generation | Matmul tiles distributed across full mesh; batch=1 decode is memory-BW-bound | 0.55 — steady reads (KV cache) |
+| `diffusion` | Expanding ring from center | Image denoising timestep | DiT/U-Net = transformer forward passes, same pattern as inference | 0.65 — periodic bursts per denoising step |
+| `agents` | Random burst clusters | Async tool-call dispatch | Sustained compute-bound utilisation; "clusters" are logical, not physical | 0.45 — irregular KV cache bursts |
+| `explore` | Sinusoidal wave | Particle Life physics field | Custom RISC-V kernels do distribute spatially — closest to spatial truth for Metalium workloads | 0.30 — moderate steady |
+| `thinking` ◆ | Sustained full-grid glow | Extended reasoning / CoT | **Most accurate** — long CoT inference is sustained high matmul utilisation across all cores | 0.12 — nearly dark (weights in L1) |
+| `prefill` ◆ | Wide fast-moving band | Parallel prompt ingestion | **Close to accurate** — prefill is genuinely compute-bound and uses all cores simultaneously | 0.90 — one large burst then drops |
+| `video` | Two phase-offset rings | Temporal video frame denoising | 3D DiT (Wan, SkyReels) = transformer layers, not rings; same as `thinking` in practice | 0.70 — two phase-offset burst channels |
+| `batch` ◆ | Three concurrent sweeps | Parallel batched decode | Reasonable abstraction — batched inference does run multiple sequences through the same compute | 0.80 — broad sustained multi-sequence |
+| `kernel_dispatch` ◆ | Rectangle of cores lights up via ripple from dispatch origin | Metalium kernel launch: program compiled → NOC multicast to assigned core grid | **Close to accurate** — Metalium dispatches kernels to rectangular Tensix core grids via NOC multicast; multiple kernels can run concurrently on disjoint grids | event-driven spike at dispatch + 0.50 writeback |
 
 For live per-core utilisation data, see [tt-toplike](https://github.com/tenstorrent/tt-toplike).
 
 ### TensixViz — single chip
 
 ```js
-const viz = new TensixViz(canvas, { arch: 'blackhole' | 'wormhole' })
+const viz = new TensixViz(canvas, { arch: 'blackhole' | 'wormhole', showMemory: true })
 viz.activate('inference')
+// Override with live telemetry data
+viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
 // Legacy lesson API (unchanged)
 viz.play([{ step: 'highlight', cores: [[1,1]], color: 'teal', ms: 600 }])
 ```
