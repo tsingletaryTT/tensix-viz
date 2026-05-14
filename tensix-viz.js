@@ -145,6 +145,9 @@ var _TensixVizBundle = (() => {
     this._floatLabelData = null;
     this._loop = false;
     this._loopScript = null;
+    this._showMemory = !!opts.showMemory;
+    this._memOverride = null;
+    this._currentMode = null;
     this._cellW = 0;
     this._cellH = 0;
     this._padX = 0;
@@ -435,9 +438,17 @@ var _TensixVizBundle = (() => {
     this._heatmap = null;
     this._labels = {};
     this._floatLabelData = null;
+    this._memOverride = null;
+    this._currentMode = null;
     this._scriptQueue = [];
     this._resolveStep = null;
     this.render();
+  };
+  TensixViz.prototype.setMemoryStats = function(stats) {
+    if (!stats || typeof stats !== "object") return;
+    this._memOverride = {};
+    if (typeof stats.dram_bw === "number") this._memOverride.dram_bw = Math.max(0, Math.min(1, stats.dram_bw));
+    if (typeof stats.l1_fill === "number") this._memOverride.l1_fill = Math.max(0, Math.min(1, stats.l1_fill));
   };
   TensixViz.prototype._runLoop = function() {
     const self = this;
@@ -659,6 +670,7 @@ var _TensixVizBundle = (() => {
   };
   TensixViz.prototype.activate = function(mode, opts) {
     this.reset();
+    this._currentMode = mode;
     opts = opts || {};
     var chip = this.chip;
     var cg = chip.computeGrid;
@@ -672,7 +684,21 @@ var _TensixVizBundle = (() => {
       prev[r] = [];
       for (var c = 0; c < W; c++) prev[r][c] = 0;
     }
-    var _kd = { list: [], nextDispatch: 5 };
+    var _kd = {
+      list: [{
+        c: Math.floor((W - 4) / 2),
+        // center a 4×3 seed kernel
+        r: Math.floor((H - 3) / 2),
+        w: 4,
+        h: 3,
+        age: 12,
+        // already propagated, mid-life bright
+        maxAge: 40,
+        seed: 37
+      }],
+      nextDispatch: 1
+      // dispatch another kernel on the first frame
+    };
     var MODES = {
       idle: function(c2, r2) {
         return Math.min(1, prev[r2][c2] * 0.9 + (Math.random() < 0.03 ? Math.random() * 0.35 : 0));

@@ -823,7 +823,22 @@
     //   age      — frames elapsed since dispatch
     //   maxAge   — total lifetime before the kernel is culled
     //   seed     — per-kernel random seed for stable per-core activity noise
-    var _kd = { list: [], nextDispatch: 5 };
+    //
+    // Pre-seed one kernel at mid-age so the mode is instantly visible on
+    // every chip (no blank warmup period confusing the user), then keep
+    // nextDispatch: 1 so the second kernel fires on the very first frame.
+    var _kd = {
+      list: [{
+        c: Math.floor((W - 4) / 2),  // center a 4×3 seed kernel
+        r: Math.floor((H - 3) / 2),
+        w: 4,
+        h: 3,
+        age: 12,                      // already propagated, mid-life bright
+        maxAge: 40,
+        seed: 37
+      }],
+      nextDispatch: 1               // dispatch another kernel on the first frame
+    };
 
     var MODES = {
       idle: function (c, r) {
