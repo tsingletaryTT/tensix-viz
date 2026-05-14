@@ -313,7 +313,7 @@
   <section id="modes">
     <div class="section-inner">
       <div class="section-label">Animation</div>
-      <h2>Nine modes. Visual metaphors, not telemetry.</h2>
+      <h2>Ten modes. Visual metaphors, not telemetry.</h2>
 
       <div class="callout">
         <p>
@@ -450,6 +450,20 @@
           </div>
         </div>
 
+        <!-- kernel_dispatch -->
+        <div class="mode-card">
+          <div class="mode-canvas-wrap"><canvas id="m-kernel_dispatch" width="248" height="168"></canvas></div>
+          <div class="mode-info">
+            <span class="mode-badge badge-grounded">grounded</span>
+            <div class="mode-name">kernel_dispatch</div>
+            <p class="mode-concept">Rectangle of cores lights up via ripple from dispatch origin. Metalium kernel launch via NOC multicast.</p>
+            <p class="mode-reality">
+              <span class="hw-label">hardware</span>
+              Metalium dispatches kernels to rectangular Tensix core grids via NOC multicast. Multiple kernels can run concurrently on disjoint grids. The ripple origin corresponds to the dispatching core.
+            </p>
+          </div>
+        </div>
+
       </div><!-- end mode-grid -->
     </div>
   </section>
@@ -468,6 +482,11 @@
 <span class="cm">// Single Blackhole chip — any mode</span>
 <span class="ct">const</span> viz = <span class="ct">new</span> TensixViz(canvas, { arch: <span class="cg">'blackhole'</span> })
 viz.activate(<span class="cg">'thinking'</span>)  <span class="cm">// or 'prefill', 'batch', 'inference' …</span>
+
+<span class="cm">// Memory visualization layer (opt-in)</span>
+<span class="ct">const</span> memViz = <span class="ct">new</span> TensixViz(canvas, { arch: <span class="cg">'blackhole'</span>, showMemory: <span class="ct">true</span> })
+memViz.activate(<span class="cg">'inference'</span>)
+memViz.setMemoryStats({ dram_bw: <span class="cg">0.75</span>, l1_fill: <span class="cg">0.60</span> })  <span class="cm">// override with live data</span>
 
 <span class="cm">// Full QB2 system (4 chips, intra/inter-card ETH links)</span>
 <span class="ct">const</span> sys = <span class="ct">new</span> SystemViz(container, <span class="cg">'qb2'</span>)
@@ -496,6 +515,7 @@ sys.activate(<span class="cg">'batch'</span>)
           <tr><td><code>prefill</code></td><td>Parallel prompt ingestion</td><td style="color:var(--green)">◆ grounded</td></tr>
           <tr><td><code>video</code></td><td>Temporal video frame denoising (3D DiT)</td><td style="color:var(--muted)">metaphor</td></tr>
           <tr><td><code>batch</code></td><td>Batched parallel decode</td><td style="color:var(--green)">◆ grounded</td></tr>
+          <tr><td><code>kernel_dispatch</code></td><td>Metalium kernel launch via NOC multicast</td><td style="color:var(--green)">◆ grounded</td></tr>
         </tbody>
       </table>
     </div>
@@ -540,8 +560,8 @@ sys.activate(<span class="cg">'batch'</span>)
     const anatomyChip = new TensixViz(document.getElementById('anatomy-chip'), { arch: 'blackhole' })
     anatomyChip.activate('idle')
 
-    // Nine mode canvases
-    const MODES = ['idle','inference','diffusion','agents','explore','thinking','prefill','video','batch']
+    // Ten mode canvases
+    const MODES = ['idle','inference','diffusion','agents','explore','thinking','prefill','video','batch','kernel_dispatch']
     MODES.forEach(function(mode) {
       const canvas = document.getElementById('m-' + mode)
       if (!canvas) return
