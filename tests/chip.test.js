@@ -216,4 +216,22 @@ describe('TensixViz memory layer', () => {
     viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
     expect(() => viz.render()).not.toThrow()
   })
+
+  it('render() does not throw with showMemory: false (default)', () => {
+    const canvas = makeCanvas()
+    const viz = new TensixViz(canvas, { arch: 'blackhole' })
+    viz.activate('inference')
+    // showMemory defaults to false — _drawMemoryLayer should return immediately
+    expect(() => viz.render()).not.toThrow()
+  })
+
+  it('_isMem particles are spawned when showMemory: true and mode has dram_bw > 0', async () => {
+    const canvas = makeCanvas()
+    const viz = new TensixViz(canvas, { arch: 'blackhole', showMemory: true })
+    viz.activate('inference')   // dram_bw: 0.55 — high enough to spawn
+    // Run several frames to overcome spawn probability
+    for (let i = 0; i < 200; i++) viz.render()
+    const memParticles = viz._particles.filter(p => p._isMem)
+    expect(memParticles.length).toBeGreaterThan(0)
+  })
 })

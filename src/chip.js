@@ -184,10 +184,12 @@
     this._memOverride = null;                  // set by setMemoryStats(); null = use preset
     this._currentMode = null;                  // set by activate(); used by _drawMemoryLayer
 
-    this._cellW = 0;
-    this._cellH = 0;
-    this._padX  = 0;
-    this._padY  = 0;
+    this._cellW   = 0;
+    this._cellH   = 0;
+    this._padX    = 0;
+    this._padY    = 0;
+    this._dram    = [];   // array of { col, row } for every dram-type cell
+    this._compute = [];   // array of { col, row } for every tensix-type cell
 
     // Store logical (CSS-pixel) dimensions before any DPR scaling so
     // _computeLayout and render() always work in CSS-pixel coordinates.
@@ -236,6 +238,18 @@
     this._padY  = pad;
     this._cellW = Math.floor((w - pad * 2) / chip.cols);
     this._cellH = Math.floor((h - pad * 2) / chip.rows);
+
+    // Build cell-type lists used by _drawMemoryLayer() for glow and particle spawning.
+    // Populated once per layout so _drawMemoryLayer does not rebuild them each frame.
+    this._dram    = [];
+    this._compute = [];
+    for (var row = 0; row < chip.rows; row++) {
+      for (var col = 0; col < chip.cols; col++) {
+        var t = chip.coreType(col, row);
+        if (t === 'dram')   this._dram.push({ col: col, row: row });
+        if (t === 'tensix') this._compute.push({ col: col, row: row });
+      }
+    }
   };
 
   // ─── Rendering ─────────────────────────────────────────────────────────────
@@ -366,8 +380,12 @@
   //
   // Visual values come from MEM_PRESETS[_currentMode] unless _memOverride is set.
   // Colors follow the resolved theme (dark or light).
+  //
+  // Early exit: returns immediately if showMemory is off OR _memPhase has not yet
+  // been written by the animation loop (i.e. activate() hasn't ticked yet and no
+  // manual override is being used in a pure-render scenario).
   TensixViz.prototype._drawMemoryLayer = function () {
-    if (!this._showMemory) return;
+    if (!this._showMemory || !this._memPhase) return;
 
     var ctx  = this.ctx;
     var chip = this.chip;
@@ -379,16 +397,20 @@
     // ── Resolve effective dram_bw and l1_fill ─────────────────────────────────
     var mode   = this._currentMode || 'idle';
     var preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
-    var mem    = this._memPhase || { phase: 0, burstPhase: 0, kdGlow: 0 };
+    // _memPhase is guaranteed non-null by the early-exit guard above.
+    var mem    = this._memPhase;
 
-    // Envelope: burst modes pulse on a sin envelope; steady modes use a gentle breath.
+    // ── Envelope calculation ──────────────────────────────────────────────────
+    // kernel_dispatch: envelope is the decayed DRAM-glow value from the KD state.
+    // burst:           cosine wave tracking burstPhase (0 → 1 → 0 per cycle).
+    // steady:          gentle sinusoidal breath around 0.85.
     var env;
     if (preset.burstHz === 'kd') {
-      env = 0.15 + mem.kdGlow * 0.75;
+      env = mem.kdGlow;
     } else if (preset.burst) {
-      env = Math.max(0, Math.cos(mem.burstPhase * Math.PI * 2)) * 0.5 + 0.5;
+      env = 0.5 + 0.5 * Math.cos(mem.burstPhase * Math.PI * 2);
     } else {
-      env = 1.0 + 0.12 * Math.sin(mem.phase * Math.PI * 2);
+      env = 0.85 + 0.15 * Math.sin(mem.phase * Math.PI * 2);
     }
 
     var dramBw = (this._memOverride && this._memOverride.dram_bw !== undefined)
@@ -397,62 +419,71 @@
                  ? this._memOverride.l1_fill : preset.l1_fill;
 
     // ── 1. DRAM row glow ──────────────────────────────────────────────────────
-    var dramAlpha = Math.min(1, dramBw * env * 0.65);
+    // Alpha is the raw product of bandwidth and envelope — no clamping — so very
+    // low-bandwidth modes produce a near-invisible glow rather than a hard floor.
+    var dramAlpha = dramBw * env * 0.55;
     if (dramAlpha > 0.005) {
       var dc = mc.dram;
       ctx.save();
       ctx.globalAlpha = dramAlpha;
       ctx.fillStyle = 'rgb(' + dc[0] + ',' + dc[1] + ',' + dc[2] + ')';
-      for (var row = 0; row < chip.rows; row++) {
-        for (var col = 0; col < chip.cols; col++) {
-          if (chip.coreType(col, row) === 'dram') {
-            var r = this._cellRect(col, row);
-            this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
-            ctx.fill();
-          }
-        }
+      // Iterate this._dram directly (pre-built in _computeLayout) instead of
+      // scanning the full grid on every frame — avoids O(cols*rows) coreType checks.
+      for (var di = 0; di < this._dram.length; di++) {
+        var dc2 = this._dram[di];
+        var r = this._cellRect(dc2.col, dc2.row);
+        this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
+        ctx.fill();
       }
       ctx.restore();
     }
 
     // ── 2. Spawn transfer particles (DRAM→L1 reads and L1→DRAM writebacks) ───
-    // Only spawn when the animation loop has ticked at least once (heatmap present).
-    if (dramBw > 0.05 && this._heatmap) {
-      var spawnChance = dramBw * env * 0.18;
-      if (Math.random() < spawnChance) {
-        var isWriteback = (preset.writeback > 0 && Math.random() < preset.writeback);
-        var colorKey    = isWriteback ? 'write' : (preset.loadColor || 'load');
-        var pColor      = mc[colorKey];
-        var pColorStr   = 'rgb(' + pColor[0] + ',' + pColor[1] + ',' + pColor[2] + ')';
-
-        // Collect DRAM cells to use as particle spawn points
-        var dramCells = [];
-        for (var drow = 0; drow < chip.rows; drow++) {
-          for (var dcol = 0; dcol < chip.cols; dcol++) {
-            if (chip.coreType(dcol, drow) === 'dram') dramCells.push([dcol, drow]);
-          }
-        }
-        var origin  = dramCells[Math.floor(Math.random() * dramCells.length)];
-        var oCenter = this._cellCenter(origin[0], origin[1]);
-
-        var destCol = cg.colStart + Math.floor(Math.random() * (cg.colEnd - cg.colStart + 1));
-        var destRow = cg.rowStart + Math.floor(Math.random() * (cg.rowEnd - cg.rowStart + 1));
-        var dCenter = this._cellCenter(destCol, destRow);
-
-        var from = isWriteback ? dCenter : oCenter;
-        var to   = isWriteback ? oCenter : dCenter;
-
+    // Guard: only spawn when both cell lists are populated (no-op if topology has
+    // no DRAM or no compute cells, which should never happen in practice).
+    var spawnRate = dramBw * env;
+    if (spawnRate > 0 && this._compute.length > 0 && this._dram.length > 0) {
+      // Load particle: DRAM → compute (read direction)
+      if (Math.random() < spawnRate * 0.3) {
+        var fromCell  = this._dram[Math.floor(Math.random() * this._dram.length)];
+        var toCell    = this._compute[Math.floor(Math.random() * this._compute.length)];
+        var fromRect  = this._cellRect(fromCell.col, fromCell.row);
+        var toRect    = this._cellRect(toCell.col, toCell.row);
+        var loadColorArr = mc[preset.loadColor] || mc.load;
         this._particles.push({
-          x:        from.x,
-          y:        from.y,
-          startX:   from.x,
-          startY:   from.y,
-          toX:      to.x,
-          toY:      to.y,
-          color:    pColorStr,
-          radius:   Math.max(2, this._cellW * 0.12),
+          x:        fromRect.x + fromRect.w / 2,
+          y:        fromRect.y + fromRect.h / 2,
+          startX:   fromRect.x + fromRect.w / 2,
+          startY:   fromRect.y + fromRect.h / 2,
+          toX:      toRect.x + toRect.w / 2,
+          toY:      toRect.y + toRect.h / 2,
           progress: 0,
-          speed:    0.035 + Math.random() * 0.025,
+          speed:    0.008 + Math.random() * 0.012,
+          color:    'rgb(' + loadColorArr[0] + ',' + loadColorArr[1] + ',' + loadColorArr[2] + ')',
+          size:     1.5,
+          alpha:    0.8,
+          _isMem:   true,
+        });
+      }
+      // Writeback particle: compute → DRAM (write direction), separate probability roll.
+      if (preset.writeback > 0 && Math.random() < preset.writeback * spawnRate * 0.15) {
+        var wbFrom = this._compute[Math.floor(Math.random() * this._compute.length)];
+        var wbTo   = this._dram[Math.floor(Math.random() * this._dram.length)];
+        var wbFromRect = this._cellRect(wbFrom.col, wbFrom.row);
+        var wbToRect   = this._cellRect(wbTo.col,   wbTo.row);
+        var writeColorArr = mc.write;
+        this._particles.push({
+          x:        wbFromRect.x + wbFromRect.w / 2,
+          y:        wbFromRect.y + wbFromRect.h / 2,
+          startX:   wbFromRect.x + wbFromRect.w / 2,
+          startY:   wbFromRect.y + wbFromRect.h / 2,
+          toX:      wbToRect.x + wbToRect.w / 2,
+          toY:      wbToRect.y + wbToRect.h / 2,
+          progress: 0,
+          speed:    0.008 + Math.random() * 0.012,
+          color:    'rgb(' + writeColorArr[0] + ',' + writeColorArr[1] + ',' + writeColorArr[2] + ')',
+          size:     1.5,
+          alpha:    0.8,
           _isMem:   true,
         });
       }
@@ -484,7 +515,7 @@
           var barW   = cr.w * 0.70;
           var barX   = cr.x + (cr.w - barW) / 2;
           var barY   = cr.y + cr.h - fillH;
-          ctx.globalAlpha = 0.55;
+          ctx.globalAlpha = 0.75;
           ctx.fillRect(barX, barY, barW, fillH);
         }
       }
@@ -1116,6 +1147,13 @@
     if (!fn) throw new Error('Unknown animation mode: "' + mode + '"');
 
     self._running = true;
+
+    // Pre-seed _memPhase immediately so that callers who invoke render() synchronously
+    // before the first RAF tick (e.g. tests that call viz.render() in a loop) see a
+    // valid phase object and the memory layer isn't skipped by the !_memPhase guard.
+    if (self._showMemory) {
+      self._memPhase = _mem;
+    }
 
     function tick() {
       if (self._animGen !== gen) return;
