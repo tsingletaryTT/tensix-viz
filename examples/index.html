@@ -5,19 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>tensix-viz — Examples</title>
   <link rel="stylesheet" href="../tensix-viz.css">
+  <link rel="stylesheet" href="../site.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #0a1420; color: #c0ccd8; margin: 0; padding: 0; }
-    nav {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(8,15,20,.94); backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(79,209,197,.18);
-      padding: 0 2rem; display: flex; align-items: center; gap: 1.5rem; height: 52px;
-    }
-    .nav-brand { color: #4fd1c5; font-weight: 600; font-size: 0.95rem; text-decoration: none; }
-    .nav-sub   { color: #607d8b; font-size: 0.875rem; }
-    .nav-links { display: flex; gap: 1.5rem; margin-left: auto; }
-    .nav-links a { color: #b0c4d0; text-decoration: none; font-size: 0.875rem; }
-    .nav-links a:hover { color: #4fd1c5; }
     .page-body { padding: 32px; }
     h1 { color: #4fd1c5; font-size: 1.4rem; margin-bottom: 4px; }
     h2 { color: #81e6d9; font-size: 1rem; margin: 32px 0 12px; border-bottom: 1px solid #1a3c47; padding-bottom: 6px; }
@@ -37,17 +27,17 @@
   </style>
 </head>
 <body>
-  <nav>
-    <a class="nav-brand" href="./index.html">tensix-viz</a>
-    <span class="nav-sub">/ examples</span>
-    <div class="nav-links">
-      <a href="./index.html">Docs</a>
-      <a href="https://github.com/tsingletaryTT/tensix-viz">GitHub ↗</a>
+  <nav class="site-nav">
+    <a class="site-nav-brand" href="../docs/index.html">tensix-viz</a>
+    <div class="site-nav-links">
+      <a class="site-nav-link" href="../docs/index.html">Docs</a>
+      <a class="site-nav-link site-nav-link--active" href="#">Examples</a>
+      <a class="site-nav-link" href="https://github.com/tsingletaryTT/tensix-viz" target="_blank">GitHub ↗</a>
     </div>
   </nav>
   <div class="page-body">
   <h1>tensix-viz — Examples</h1>
-  <p>All four renderer classes, all nine animation modes, and all three themes. Use the controls to switch modes and palettes live.</p>
+  <p>All four renderer classes, all ten animation modes, and all three themes. Use the controls to switch modes and palettes live.</p>
 
   <!-- ── Theme toggle ───────────────────────────────────────────────────── -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:10px 14px;background:#0d1f2d;border:1px solid #1a3c47;border-radius:6px">
@@ -76,6 +66,7 @@
         <button class="mode-btn" onclick="setChipMode('prefill',this)">prefill</button>
         <button class="mode-btn" onclick="setChipMode('video',this)">video</button>
         <button class="mode-btn" onclick="setChipMode('batch',this)">batch</button>
+        <button class="mode-btn" onclick="setChipMode('kernel_dispatch',this)">kernel_dispatch</button>
       </div>
     </div>
     <div class="demo-card">
