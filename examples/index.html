@@ -256,7 +256,76 @@ await viz.transitionTo('system')               // zoom back out</pre>
     themeChipDark.activate('thinking')
     themeChipLight.activate('thinking')
     themeChipAuto.activate('thinking')
+
+    // ── 7. Memory visualization ──
+    const memViz = new TensixViz(document.getElementById('mem-chip'), { arch: 'blackhole', showMemory: true })
+    memViz.activate('inference')
+
+    function updateMemSlider(key, val) {
+      const stat = {}
+      stat[key] = parseFloat(val)
+      memViz.setMemoryStats(stat)
+      document.getElementById(key === 'dram_bw' ? 'val-dram' : 'val-l1').textContent = parseFloat(val).toFixed(2)
+    }
+
+    function setMemMode(mode) {
+      memViz.activate(mode)
+    }
   </script>
+
+  <!-- ── 7. Memory visualization ─────────────────────────────────────────── -->
+  <h2>7. Memory visualization — <code>showMemory: true</code></h2>
+  <p>An opt-in DRAM activity and L1 fill overlay for <code>TensixViz</code>. Use the sliders to drive <code>setMemoryStats()</code> live, or switch modes to see each preset.</p>
+  <div class="demo-row">
+    <div class="demo-card">
+      <canvas id="mem-chip" width="340" height="240"></canvas>
+      <div style="margin-top:12px">
+        <div style="display:grid;grid-template-columns:max-content 1fr max-content;gap:6px 10px;align-items:center;font-size:0.78rem;color:#607d8b">
+          <label for="slider-dram">DRAM bandwidth</label>
+          <input id="slider-dram" type="range" min="0" max="1" step="0.01" value="0.55"
+                 oninput="updateMemSlider('dram_bw', this.value)"
+                 style="accent-color:#4fd1c5">
+          <span id="val-dram">0.55</span>
+          <label for="slider-l1">L1 fill</label>
+          <input id="slider-l1" type="range" min="0" max="1" step="0.01" value="0.45"
+                 oninput="updateMemSlider('l1_fill', this.value)"
+                 style="accent-color:#4fd1c5">
+          <span id="val-l1">0.45</span>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:0.78rem;color:#607d8b">
+          <label for="mem-mode-select">Mode:</label>
+          <select id="mem-mode-select" onchange="setMemMode(this.value)"
+                  style="background:#0d1f2d;border:1px solid #1a3c47;color:#81e6d9;border-radius:4px;padding:3px 8px;font-size:0.78rem">
+            <option value="idle">idle</option>
+            <option value="inference" selected>inference</option>
+            <option value="prefill">prefill</option>
+            <option value="thinking">thinking</option>
+            <option value="agents">agents</option>
+            <option value="diffusion">diffusion</option>
+            <option value="video">video</option>
+            <option value="batch">batch</option>
+            <option value="explore">explore</option>
+            <option value="kernel_dispatch">kernel_dispatch</option>
+          </select>
+        </div>
+        <p style="font-size:0.72rem;color:#3d5a66;margin-top:8px;margin-bottom:0">Values normalized 0–1 (1.0 ≈ peak BH bandwidth ~900 GB/s). Switching modes clears the override; move a slider to re-apply. All values are visual metaphors unless driven by real telemetry.</p>
+      </div>
+    </div>
+    <div class="demo-card">
+      <details>
+        <summary style="color:#81e6d9;font-size:0.85rem;cursor:pointer;margin-bottom:8px">Show API</summary>
+        <pre>const viz = new TensixViz(canvas, { arch: 'blackhole', showMemory: true })
+viz.activate('inference')
+
+// override with real telemetry
+viz.setMemoryStats({ dram_bw: 0.75, l1_fill: 0.60 })
+
+// partial override — only dram_bw changes; l1_fill stays on preset
+viz.setMemoryStats({ dram_bw: 0.90 })</pre>
+      </details>
+    </div>
+  </div>
+
   </div><!-- end page-body -->
   <script>
   function setTheme(mode) {
