@@ -36,7 +36,7 @@
       /* inline-block so the screenshot crops to canvas size exactly */
       container.style.display = 'inline-block'
       container.appendChild(canvas)
-      new TensixViz(canvas, { arch }).activate(mode)
+      new TensixViz(canvas, { arch, showMemory: params.get('showMemory') === 'true' }).activate(mode)
 
     } else if (type === 'card') {
       /* ── CardViz — 2-chip card ── */

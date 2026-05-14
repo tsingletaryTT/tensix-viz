@@ -96,6 +96,43 @@ var THEME_LIGHT = {
   floatLabelBg: "rgba(238,244,248,0.92)",
   floatLabelFg: "#0A4A58"
 };
+var MEM_COLORS = {
+  dark: {
+    dram: [0, 210, 190],
+    // bright teal — DRAM row glow
+    l1: [255, 180, 50],
+    // warm amber  — L1 fill bar
+    load: [0, 210, 190],
+    // teal        — DRAM→L1 read particles
+    burst: [255, 200, 80],
+    // gold        — prefetch / burst load
+    write: [220, 80, 160]
+    // vivid pink  — L1→DRAM writeback particles
+  },
+  light: {
+    dram: [0, 140, 130],
+    // deeper teal
+    l1: [160, 80, 10],
+    // darker amber
+    load: [0, 140, 130],
+    burst: [190, 130, 0],
+    // darker gold
+    write: [180, 40, 120]
+    // deeper rose
+  }
+};
+var MEM_PRESETS = {
+  idle: { dram_bw: 0.05, l1_fill: 0.02, burst: false, burstHz: 0, writeback: 0, loadColor: "load" },
+  inference: { dram_bw: 0.55, l1_fill: 0.45, burst: false, burstHz: 0, writeback: 0, loadColor: "load" },
+  prefill: { dram_bw: 0.9, l1_fill: 0.85, burst: true, burstHz: 0.5, writeback: 0.2, loadColor: "burst" },
+  thinking: { dram_bw: 0.12, l1_fill: 0.92, burst: false, burstHz: 0, writeback: 0, loadColor: "load" },
+  agents: { dram_bw: 0.45, l1_fill: 0.4, burst: true, burstHz: 0.8, writeback: 0, loadColor: "load" },
+  diffusion: { dram_bw: 0.65, l1_fill: 0.6, burst: true, burstHz: 1.2, writeback: 0, loadColor: "load" },
+  video: { dram_bw: 0.7, l1_fill: 0.65, burst: true, burstHz: 1.6, writeback: 0, loadColor: "load" },
+  batch: { dram_bw: 0.8, l1_fill: 0.6, burst: false, burstHz: 0, writeback: 0, loadColor: "load" },
+  explore: { dram_bw: 0.3, l1_fill: 0.35, burst: false, burstHz: 0, writeback: 0, loadColor: "load" },
+  kernel_dispatch: { dram_bw: 0.15, l1_fill: 0.55, burst: true, burstHz: "kd", writeback: 0.5, loadColor: "burst" }
+};
 function TensixViz(canvas, opts) {
   opts = opts || {};
   this.canvas = canvas;
@@ -123,6 +160,8 @@ function TensixViz(canvas, opts) {
   this._cellH = 0;
   this._padX = 0;
   this._padY = 0;
+  this._dram = [];
+  this._compute = [];
   this._logicalW = canvas.width;
   this._logicalH = canvas.height;
   var dpr = typeof window !== "undefined" && window.devicePixelRatio || 1;
@@ -156,6 +195,15 @@ TensixViz.prototype._computeLayout = function() {
   this._padY = pad;
   this._cellW = Math.floor((w - pad * 2) / chip.cols);
   this._cellH = Math.floor((h - pad * 2) / chip.rows);
+  this._dram = [];
+  this._compute = [];
+  for (var row = 0; row < chip.rows; row++) {
+    for (var col = 0; col < chip.cols; col++) {
+      var t = chip.coreType(col, row);
+      if (t === "dram") this._dram.push({ col, row });
+      if (t === "tensix") this._compute.push({ col, row });
+    }
+  }
 };
 TensixViz.prototype.render = function() {
   this._theme = this._resolveTheme();
@@ -183,6 +231,7 @@ TensixViz.prototype.render = function() {
     this._drawCellLabel(col, row, text);
   });
   this._particles.forEach((p) => this._drawParticle(p));
+  this._drawMemoryLayer();
   this._drawNocLines();
 };
 TensixViz.prototype._cellRect = function(col, row) {
@@ -247,6 +296,116 @@ TensixViz.prototype._drawNocLines = function() {
     ctx.stroke();
   }
   ctx.setLineDash([]);
+};
+TensixViz.prototype._drawMemoryLayer = function() {
+  if (!this._showMemory || !this._memPhase) return;
+  const ctx = this.ctx;
+  const chip = this.chip;
+  const cg = chip.computeGrid;
+  const T = this._theme;
+  const isDark = T === THEME_DARK;
+  const mc = isDark ? MEM_COLORS.dark : MEM_COLORS.light;
+  const mode = this._currentMode || "idle";
+  const preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
+  const mem = this._memPhase;
+  let env;
+  if (preset.burstHz === "kd") {
+    env = mem.kdGlow;
+  } else if (preset.burst) {
+    env = 0.5 + 0.5 * Math.cos(mem.burstPhase * Math.PI * 2);
+  } else {
+    env = 0.85 + 0.15 * Math.sin(mem.phase * Math.PI * 2);
+  }
+  const dramBw = this._memOverride && this._memOverride.dram_bw !== void 0 ? this._memOverride.dram_bw : preset.dram_bw;
+  const l1Fill = this._memOverride && this._memOverride.l1_fill !== void 0 ? this._memOverride.l1_fill : preset.l1_fill;
+  const dramAlpha = dramBw * env * 0.55;
+  if (dramAlpha > 5e-3) {
+    const dramColor = mc.dram;
+    ctx.save();
+    ctx.globalAlpha = dramAlpha;
+    ctx.fillStyle = "rgb(" + dramColor[0] + "," + dramColor[1] + "," + dramColor[2] + ")";
+    for (let di = 0; di < this._dram.length; di++) {
+      const dc = this._dram[di];
+      const r = this._cellRect(dc.col, dc.row);
+      this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  const spawnRate = dramBw * env;
+  if (spawnRate > 0 && this._compute.length > 0 && this._dram.length > 0) {
+    if (Math.random() < spawnRate * 0.3) {
+      const fromCell = this._dram[Math.floor(Math.random() * this._dram.length)];
+      const toCell = this._compute[Math.floor(Math.random() * this._compute.length)];
+      const fromRect = this._cellRect(fromCell.col, fromCell.row);
+      const toRect = this._cellRect(toCell.col, toCell.row);
+      const loadColorArr = mc[preset.loadColor] || mc.load;
+      this._particles.push({
+        x: fromRect.x + fromRect.w / 2,
+        y: fromRect.y + fromRect.h / 2,
+        startX: fromRect.x + fromRect.w / 2,
+        startY: fromRect.y + fromRect.h / 2,
+        toX: toRect.x + toRect.w / 2,
+        toY: toRect.y + toRect.h / 2,
+        progress: 0,
+        speed: 8e-3 + Math.random() * 0.012,
+        color: "rgb(" + loadColorArr[0] + "," + loadColorArr[1] + "," + loadColorArr[2] + ")",
+        radius: 1.5,
+        alpha: 0.8,
+        _isMem: true
+      });
+    }
+    if (preset.writeback > 0 && Math.random() < preset.writeback * spawnRate * 0.15) {
+      const wbFrom = this._compute[Math.floor(Math.random() * this._compute.length)];
+      const wbTo = this._dram[Math.floor(Math.random() * this._dram.length)];
+      const wbFromRect = this._cellRect(wbFrom.col, wbFrom.row);
+      const wbToRect = this._cellRect(wbTo.col, wbTo.row);
+      const writeColorArr = mc.write;
+      this._particles.push({
+        x: wbFromRect.x + wbFromRect.w / 2,
+        y: wbFromRect.y + wbFromRect.h / 2,
+        startX: wbFromRect.x + wbFromRect.w / 2,
+        startY: wbFromRect.y + wbFromRect.h / 2,
+        toX: wbToRect.x + wbToRect.w / 2,
+        toY: wbToRect.y + wbToRect.h / 2,
+        progress: 0,
+        speed: 8e-3 + Math.random() * 0.012,
+        color: "rgb(" + writeColorArr[0] + "," + writeColorArr[1] + "," + writeColorArr[2] + ")",
+        radius: 1.5,
+        alpha: 0.8,
+        _isMem: true
+      });
+    }
+  }
+  for (let i = this._particles.length - 1; i >= 0; i--) {
+    const p = this._particles[i];
+    if (!p._isMem) continue;
+    p.progress = Math.min(1, p.progress + p.speed);
+    p.x = p.startX + (p.toX - p.startX) * p.progress;
+    p.y = p.startY + (p.toY - p.startY) * p.progress;
+    if (p.progress >= 1) {
+      this._particles.splice(i, 1);
+    }
+  }
+  if (l1Fill > 0.01) {
+    const lc = mc.l1;
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = "rgb(" + lc[0] + "," + lc[1] + "," + lc[2] + ")";
+    for (let lrow = cg.rowStart; lrow <= cg.rowEnd; lrow++) {
+      for (let lcol = cg.colStart; lcol <= cg.colEnd; lcol++) {
+        if (chip.coreType(lcol, lrow) !== "tensix") continue;
+        const cr = this._cellRect(lcol, lrow);
+        const noise = 1 + 0.15 * Math.sin(lcol * 3.7 + lrow * 2.9 + mem.phase * Math.PI);
+        const fillH = Math.min(cr.h * 0.9, cr.h * l1Fill * noise);
+        const barW = cr.w * 0.7;
+        const barX = cr.x + (cr.w - barW) / 2;
+        const barY = cr.y + cr.h - fillH;
+        ctx.fillRect(barX, barY, barW, fillH);
+      }
+    }
+    ctx.restore();
+  }
 };
 TensixViz.prototype._drawHighlight = function(col, row, hl) {
   const ctx = this.ctx;
@@ -670,6 +829,14 @@ TensixViz.prototype.activate = function(mode, opts) {
     nextDispatch: 1
     // dispatch another kernel on the first frame
   };
+  var _mem = {
+    phase: 0,
+    // continuously incrementing phase counter
+    burstPhase: 0,
+    // fractional phase within a burst cycle (0–1)
+    kdGlow: 0
+    // current DRAM glow for kernel_dispatch (decays per frame)
+  };
   var MODES = {
     idle: function(c2, r2) {
       return Math.min(1, prev[r2][c2] * 0.9 + (Math.random() < 0.03 ? Math.random() * 0.35 : 0));
@@ -769,9 +936,24 @@ TensixViz.prototype.activate = function(mode, opts) {
   var fn = MODES[mode];
   if (!fn) throw new Error('Unknown animation mode: "' + mode + '"');
   self._running = true;
+  if (self._showMemory) {
+    self._memPhase = _mem;
+  }
   function tick() {
     if (self._animGen !== gen) return;
     t += 0.012;
+    if (self._showMemory) {
+      _mem.phase += 0.012;
+      var preset = MEM_PRESETS[mode] || MEM_PRESETS.idle;
+      if (preset.burst && preset.burstHz !== "kd") {
+        _mem.burstPhase = (_mem.burstPhase + preset.burstHz * 0.012) % 1;
+      }
+      if (preset.burstHz === "kd") {
+        var kdActive = _kd.list.length > 0 ? 1 : 0;
+        _mem.kdGlow = _mem.kdGlow * 0.92 + kdActive * 0.08;
+      }
+      self._memPhase = _mem;
+    }
     var next = [];
     var hmap = [];
     for (var r2 = 0; r2 < H; r2++) {

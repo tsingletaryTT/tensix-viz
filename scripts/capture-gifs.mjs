@@ -85,6 +85,15 @@ const GIFS = [
     warmupMs: 1000,  // wait for a few kernel dispatches to appear before recording
     maxWidth: 340,
   },
+  {
+    name:     'memory',
+    // BH chip in inference mode with memory layer — DRAM glow + particle streams + L1 bars
+    params:   { type: 'chip', arch: 'blackhole', mode: 'inference', showMemory: 'true' },
+    fps:      12,
+    seconds:  4,
+    warmupMs: 800,
+    maxWidth: 340,
+  },
 ]
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
