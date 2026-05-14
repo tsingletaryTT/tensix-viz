@@ -145,3 +145,15 @@ describe('TensixViz._resolveTheme', () => {
     expect(T.bg).toBe('#EEF4F8')
   })
 })
+
+describe('TensixViz memory layer', () => {
+  function makeCanvas() {
+    const c = document.createElement('canvas')
+    c.width = 340; c.height = 240
+    return c
+  }
+
+  it('constructs with showMemory: true without throwing', () => {
+    expect(() => new TensixViz(makeCanvas(), { arch: 'blackhole', showMemory: true })).not.toThrow()
+  })
+})

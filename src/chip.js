@@ -114,6 +114,49 @@
     floatLabelFg:  '#0A4A58',
   };
 
+  // ─── Memory visualization colours ──────────────────────────────────────────
+  // Used by _drawMemoryLayer() when showMemory: true.
+  // Two palettes mirror THEME_DARK / THEME_LIGHT; color entries are [r, g, b]
+  // arrays so the caller can compose rgba() strings with a variable alpha.
+  const MEM_COLORS = {
+    dark: {
+      dram:  [  0, 210, 190],   // bright teal — DRAM row glow
+      l1:    [255, 180,  50],   // warm amber  — L1 fill bar
+      load:  [  0, 210, 190],   // teal        — DRAM→L1 read particles
+      burst: [255, 200,  80],   // gold        — prefetch / burst load
+      write: [220,  80, 160],   // vivid pink  — L1→DRAM writeback particles
+    },
+    light: {
+      dram:  [  0, 140, 130],   // deeper teal
+      l1:    [160,  80,  10],   // darker amber
+      load:  [  0, 140, 130],
+      burst: [190, 130,   0],   // darker gold
+      write: [180,  40, 120],   // deeper rose
+    },
+  };
+
+  // ─── Memory signal presets (per animation mode) ─────────────────────────────
+  // Fields:
+  //   dram_bw   0–1  DRAM row glow intensity + read particle density
+  //   l1_fill   0–1  L1 fill bar height (fraction of cell height)
+  //   burst     bool periodic burst envelope (true) vs. gentle steady breath (false)
+  //   burstHz   num  bursts per second; only used when burst: true
+  //              'kd' means burst is event-driven by kernel_dispatch _kd state
+  //   writeback 0–1  writeback particle density (L1→DRAM direction)
+  //   loadColor str  'load' | 'burst'  dominant read particle color key in MEM_COLORS
+  const MEM_PRESETS = {
+    idle:            { dram_bw: 0.05, l1_fill: 0.02, burst: false, burstHz: 0,   writeback: 0,    loadColor: 'load'  },
+    inference:       { dram_bw: 0.55, l1_fill: 0.45, burst: false, burstHz: 0,   writeback: 0,    loadColor: 'load'  },
+    prefill:         { dram_bw: 0.90, l1_fill: 0.85, burst: true,  burstHz: 0.5, writeback: 0.20, loadColor: 'burst' },
+    thinking:        { dram_bw: 0.12, l1_fill: 0.92, burst: false, burstHz: 0,   writeback: 0,    loadColor: 'load'  },
+    agents:          { dram_bw: 0.45, l1_fill: 0.40, burst: true,  burstHz: 0.8, writeback: 0,    loadColor: 'load'  },
+    diffusion:       { dram_bw: 0.65, l1_fill: 0.60, burst: true,  burstHz: 1.2, writeback: 0,    loadColor: 'load'  },
+    video:           { dram_bw: 0.70, l1_fill: 0.65, burst: true,  burstHz: 1.6, writeback: 0,    loadColor: 'load'  },
+    batch:           { dram_bw: 0.80, l1_fill: 0.60, burst: false, burstHz: 0,   writeback: 0,    loadColor: 'load'  },
+    explore:         { dram_bw: 0.30, l1_fill: 0.35, burst: false, burstHz: 0,   writeback: 0,    loadColor: 'load'  },
+    kernel_dispatch: { dram_bw: 0.15, l1_fill: 0.55, burst: true,  burstHz: 'kd', writeback: 0.50, loadColor: 'burst' },
+  };
+
   // ─── TensixViz class ───────────────────────────────────────────────────────
   function TensixViz(canvas, opts) {
     opts = opts || {};
