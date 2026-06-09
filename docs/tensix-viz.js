@@ -1046,8 +1046,10 @@ var _TensixVizBundle = (() => {
       const w = ctx.measureText(text).width + pad * 2;
       const h = 18;
       const margin = 4;
-      const cx = Math.max(w / 2 + margin, Math.min(this._logicalW - w / 2 - margin, rawCx));
-      const cy = Math.max(h / 2 + margin, Math.min(this._logicalH - h / 2 - margin, rawCy));
+      const cxLo = w / 2 + margin, cxHi = this._logicalW - w / 2 - margin;
+      const cyLo = h / 2 + margin, cyHi = this._logicalH - h / 2 - margin;
+      const cx = cxLo <= cxHi ? Math.max(cxLo, Math.min(cxHi, rawCx)) : this._logicalW / 2;
+      const cy = cyLo <= cyHi ? Math.max(cyLo, Math.min(cyHi, rawCy)) : this._logicalH / 2;
       const T = this._theme;
       ctx.fillStyle = T.floatLabelBg;
       ctx.strokeStyle = T.teal;
