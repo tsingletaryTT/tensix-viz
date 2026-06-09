@@ -139,7 +139,6 @@ var MEM_PRESETS = {
 function TensixViz(canvas, opts) {
   opts = opts || {};
   this.canvas = canvas;
-  this.ctx = canvas.getContext("2d");
   this.arch = opts.arch || "wormhole";
   this.speed = opts.speed || 1;
   this.chip = CHIPS[this.arch] || CHIPS.wormhole;
@@ -158,6 +157,7 @@ function TensixViz(canvas, opts) {
   this._loopScript = null;
   this._showMemory = !!opts.showMemory;
   this._memOverride = null;
+  this._memPhase = null;
   this._currentMode = null;
   this._cellW = 0;
   this._cellH = 0;
@@ -165,14 +165,24 @@ function TensixViz(canvas, opts) {
   this._padY = 0;
   this._dram = [];
   this._compute = [];
-  this._logicalW = canvas.width;
-  this._logicalH = canvas.height;
   var dpr = typeof window !== "undefined" && window.devicePixelRatio || 1;
+  var logicalW = canvas.width;
+  var logicalH = canvas.height;
+  if (typeof window !== "undefined" && canvas.parentElement) {
+    var containerW = canvas.parentElement.clientWidth;
+    if (containerW > 0 && containerW < logicalW) {
+      logicalH = Math.round(logicalH * containerW / logicalW);
+      logicalW = containerW;
+    }
+  }
+  this._logicalW = logicalW;
+  this._logicalH = logicalH;
+  canvas.width = Math.round(logicalW * dpr);
+  canvas.height = Math.round(logicalH * dpr);
+  canvas.style.width = logicalW + "px";
+  canvas.style.height = logicalH + "px";
+  this.ctx = canvas.getContext("2d");
   if (dpr > 1) {
-    canvas.width = Math.round(this._logicalW * dpr);
-    canvas.height = Math.round(this._logicalH * dpr);
-    canvas.style.width = this._logicalW + "px";
-    canvas.style.height = this._logicalH + "px";
     this.ctx.scale(dpr, dpr);
   }
   this._computeLayout();
@@ -466,6 +476,7 @@ TensixViz.prototype._drawHeatmap = function() {
   let maxVal = 0;
   for (let row = cg.rowStart; row <= cg.rowEnd; row++) {
     for (let col = cg.colStart; col <= cg.colEnd; col++) {
+      if (chip.coreType(col, row) !== "tensix") continue;
       const v = (this._heatmap[row] || [])[col] || 0;
       if (v > maxVal) maxVal = v;
     }
@@ -473,6 +484,7 @@ TensixViz.prototype._drawHeatmap = function() {
   if (maxVal === 0) return;
   for (let row = cg.rowStart; row <= cg.rowEnd; row++) {
     for (let col = cg.colStart; col <= cg.colEnd; col++) {
+      if (chip.coreType(col, row) !== "tensix") continue;
       const v = ((this._heatmap[row] || [])[col] || 0) / maxVal;
       const r = this._cellRect(col, row);
       const color = this._heatColor(v, this._theme);
@@ -572,6 +584,7 @@ TensixViz.prototype.reset = function() {
   this._labels = {};
   this._floatLabelData = null;
   this._memOverride = null;
+  this._memPhase = null;
   this._currentMode = null;
   this._scriptQueue = [];
   this._resolveStep = null;
@@ -998,11 +1011,14 @@ TensixViz.prototype.render = function() {
   _origRender.call(this);
   if (this._floatLabelData) {
     const ctx = this.ctx;
-    const { cx, cy, text } = this._floatLabelData;
+    const { cx: rawCx, cy: rawCy, text } = this._floatLabelData;
     const pad = 6;
     ctx.font = "bold 11px sans-serif";
     const w = ctx.measureText(text).width + pad * 2;
     const h = 18;
+    const margin = 4;
+    const cx = Math.max(w / 2 + margin, Math.min(this._logicalW - w / 2 - margin, rawCx));
+    const cy = Math.max(h / 2 + margin, Math.min(this._logicalH - h / 2 - margin, rawCy));
     const T = this._theme;
     ctx.fillStyle = T.floatLabelBg;
     ctx.strokeStyle = T.teal;
