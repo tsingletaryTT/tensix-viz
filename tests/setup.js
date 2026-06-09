@@ -63,6 +63,9 @@ class MockElement {
     // parentElement is null until this node is appended into another element;
     // used by _resolveTheme() to walk up the DOM tree for theme classes.
     this.parentElement = null
+    // clientWidth/clientHeight default to 0 (pre-layout); tests override as needed.
+    this.clientWidth  = 0
+    this.clientHeight = 0
   }
   appendChild(child) { this._children.push(child); child.parentElement = this; return child }
   insertBefore(newChild, ref) {
