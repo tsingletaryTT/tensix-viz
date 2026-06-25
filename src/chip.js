@@ -795,8 +795,12 @@
   TensixViz.prototype._execStep = function (step, done) {
     const self = this;
     // Accept both authoring schemas: {step, cores, ...} and {action, coords, ...}.
+    // Normalize onto a shallow clone — play()/stepThrough() only shallow-copy the
+    // script array, so mutating `step` here would alter the caller's objects.
     const kind = step.step || step.action;
-    if (step.cores == null && step.coords != null) step.cores = step.coords;
+    if (step.cores == null && step.coords != null) {
+      step = Object.assign({}, step, { cores: step.coords });
+    }
     switch (kind) {
       case 'highlight':   return self._stepHighlight(step, done);
       case 'unhighlight': return self._stepUnhighlight(step, done);

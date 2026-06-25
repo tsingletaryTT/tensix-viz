@@ -28,7 +28,9 @@ describe('autoInit', () => {
     const el = document.createElement('div')
     el.dataset.viz = 'card'
     el.dataset.config = 'bh-p300c'
-    const spy = vi.spyOn(document, 'querySelectorAll')
+    // Stub activate() so no setTimeout/RAF animation loops are scheduled (no leaked timers).
+    const activateSpy = vi.spyOn(CardViz.prototype, 'activate').mockImplementation(() => {})
+    const qsaSpy = vi.spyOn(document, 'querySelectorAll')
       .mockImplementation((sel) => (sel === '[data-viz]' ? [el] : []))
     try {
       autoInit()
@@ -39,7 +41,8 @@ describe('autoInit', () => {
       expect(el._tensixViz).toBe(first)            // same instance, not recreated
       expect(el.children.length).toBe(childCount)  // no duplicate render appended
     } finally {
-      spy.mockRestore()
+      qsaSpy.mockRestore()
+      activateSpy.mockRestore()
     }
   })
 })

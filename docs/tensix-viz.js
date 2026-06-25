@@ -671,7 +671,9 @@ var _TensixVizBundle = (() => {
   TensixViz.prototype._execStep = function(step, done) {
     const self = this;
     const kind = step.step || step.action;
-    if (step.cores == null && step.coords != null) step.cores = step.coords;
+    if (step.cores == null && step.coords != null) {
+      step = Object.assign({}, step, { cores: step.coords });
+    }
     switch (kind) {
       case "highlight":
         return self._stepHighlight(step, done);
