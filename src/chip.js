@@ -794,7 +794,10 @@
 
   TensixViz.prototype._execStep = function (step, done) {
     const self = this;
-    switch (step.step) {
+    // Accept both authoring schemas: {step, cores, ...} and {action, coords, ...}.
+    const kind = step.step || step.action;
+    if (step.cores == null && step.coords != null) step.cores = step.coords;
+    switch (kind) {
       case 'highlight':   return self._stepHighlight(step, done);
       case 'unhighlight': return self._stepUnhighlight(step, done);
       case 'transfer':    return self._stepTransfer(step, done);

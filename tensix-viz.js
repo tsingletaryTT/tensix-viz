@@ -670,7 +670,9 @@ var _TensixVizBundle = (() => {
   };
   TensixViz.prototype._execStep = function(step, done) {
     const self = this;
-    switch (step.step) {
+    const kind = step.step || step.action;
+    if (step.cores == null && step.coords != null) step.cores = step.coords;
+    switch (kind) {
       case "highlight":
         return self._stepHighlight(step, done);
       case "unhighlight":
@@ -1707,6 +1709,7 @@ var _TensixVizBundle = (() => {
   function autoInit() {
     if (typeof document === "undefined") return;
     document.querySelectorAll("[data-viz]").forEach(function(el) {
+      if (el._tensixViz) return;
       const type = el.dataset.viz;
       const config = el.dataset.config != null ? el.dataset.config : el.dataset.arch != null ? el.dataset.arch : "bh-chip";
       const mode = el.dataset.mode != null ? el.dataset.mode : "idle";
