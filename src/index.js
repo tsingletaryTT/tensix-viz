@@ -32,6 +32,8 @@ export function autoInit() {
 
   // New API: [data-viz] attribute
   document.querySelectorAll('[data-viz]').forEach(function (el) {
+    // Idempotent: autoInit may run more than once (e.g. bundle self-init + an explicit call)
+    if (el._tensixViz) return
     const type   = el.dataset.viz
     const config = el.dataset.config != null ? el.dataset.config
                  : el.dataset.arch   != null ? el.dataset.arch

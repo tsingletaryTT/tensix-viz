@@ -2,6 +2,21 @@
 
 All notable changes to tensix-viz are documented here.
 
+## [1.1.1] - 2026-06-25
+
+### Fixed
+
+- **Animation player accepts both script schemas** (`src/chip.js` `_execStep`)
+  The player dispatched on `step.step` and read `step.cores` only, so scripts authored with the
+  alternate `{ action, coords }` schema ran zero steps — the Play button (and auto-play) appeared
+  dead. `_execStep` now dispatches on `step.step || step.action` and falls back `coords → cores`,
+  so blocks written in either schema animate.
+
+- **`autoInit()` is idempotent for `[data-viz]` elements** (`src/index.js`)
+  `autoInit()` can run more than once (the bundle's self-init plus an explicit call). For `card`
+  and `system` vizzes — which append their render into the host element — the second run appended
+  a duplicate set of chips. `autoInit()` now skips any element already initialized (`el._tensixViz`).
+
 ## [1.1.0] - 2026-06-09
 
 ### Fixed

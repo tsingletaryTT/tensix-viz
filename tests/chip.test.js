@@ -71,6 +71,19 @@ describe('TensixViz', () => {
     viz.reset()
   })
 
+  it('_execStep accepts the {action, coords} schema without mutating the step', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    // Authored with action/coords rather than step/cores — must still highlight.
+    const step = { action: 'highlight', coords: [[1, 1], [2, 1]], color: 'tensixActive' }
+    viz._execStep(step, () => {})
+    expect(viz._highlights['1,1']).toBeTruthy()
+    expect(viz._highlights['2,1']).toBeTruthy()
+    // Caller's step object must not be mutated (no `cores` injected).
+    expect(step.cores).toBeUndefined()
+    expect(step.coords).toHaveLength(2)
+    viz.reset()
+  })
+
   it('activate() writes _heatmap at chip grid coordinates after a tick', async () => {
     const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
     viz.activate('inference')

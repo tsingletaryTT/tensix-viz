@@ -1,5 +1,5 @@
 // tests/index.test.js
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { TensixViz, CardViz, SystemViz, ClusterViz, autoInit } from '../src/index.js'
 
 describe('index exports', () => {
@@ -22,5 +22,27 @@ describe('autoInit', () => {
     expect(typeof TensixViz.autoInit).toBe('function')
     // Calling autoInit() should invoke the legacy path without throwing.
     expect(() => autoInit()).not.toThrow()
+  })
+
+  it('is idempotent — running twice does not re-init a [data-viz] element', () => {
+    const el = document.createElement('div')
+    el.dataset.viz = 'card'
+    el.dataset.config = 'bh-p300c'
+    // Stub activate() so no setTimeout/RAF animation loops are scheduled (no leaked timers).
+    const activateSpy = vi.spyOn(CardViz.prototype, 'activate').mockImplementation(() => {})
+    const qsaSpy = vi.spyOn(document, 'querySelectorAll')
+      .mockImplementation((sel) => (sel === '[data-viz]' ? [el] : []))
+    try {
+      autoInit()
+      const first = el._tensixViz
+      expect(first).toBeTruthy()
+      const childCount = el.children.length
+      autoInit()
+      expect(el._tensixViz).toBe(first)            // same instance, not recreated
+      expect(el.children.length).toBe(childCount)  // no duplicate render appended
+    } finally {
+      qsaSpy.mockRestore()
+      activateSpy.mockRestore()
+    }
   })
 })
