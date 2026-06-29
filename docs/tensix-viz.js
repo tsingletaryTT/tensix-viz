@@ -1110,7 +1110,6 @@ var _TensixVizBundle = (() => {
       if (container._tensixViz) return;
       const arch = container.dataset.arch || "wormhole";
       const viz = new TensixViz(canvas, { arch });
-      container._tensixViz = viz;
       let script = [];
       try {
         script = JSON.parse(container.dataset.script || "[]");
@@ -1147,6 +1146,7 @@ var _TensixVizBundle = (() => {
           viz.next();
         });
       }
+      container._tensixViz = viz;
     });
   };
 

@@ -1081,7 +1081,6 @@ TensixViz.autoInit = function() {
     if (container._tensixViz) return;
     const arch = container.dataset.arch || "wormhole";
     const viz = new TensixViz(canvas, { arch });
-    container._tensixViz = viz;
     let script = [];
     try {
       script = JSON.parse(container.dataset.script || "[]");
@@ -1118,6 +1117,7 @@ TensixViz.autoInit = function() {
         viz.next();
       });
     }
+    container._tensixViz = viz;
   });
 };
 

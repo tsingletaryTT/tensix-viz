@@ -1342,7 +1342,6 @@
 
       const arch   = container.dataset.arch || 'wormhole';
       const viz    = new TensixViz(canvas, { arch });
-      container._tensixViz = viz;
 
       let script = [];
       try { script = JSON.parse(container.dataset.script || '[]'); } catch (e) {}
@@ -1381,6 +1380,11 @@
           viz.next();
         });
       }
+
+      // Mark initialised only after synchronous setup has fully succeeded, so a
+      // throw above (e.g. renderLegend) leaves the container un-flagged and a
+      // later autoInit() can retry rather than skip a half-built widget.
+      container._tensixViz = viz;
     });
   };
 
