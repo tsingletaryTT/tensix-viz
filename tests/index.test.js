@@ -45,4 +45,31 @@ describe('autoInit', () => {
       activateSpy.mockRestore()
     }
   })
+
+  it('TensixViz.autoInit is idempotent — running twice reuses the single-chip instance', () => {
+    const canvas = document.createElement('canvas')
+    const container = document.createElement('div')
+    container.appendChild(canvas)
+    container.dataset.arch = 'blackhole'
+    container.dataset.script = '[]'
+    // The container resolves its own canvas; controls/legend are absent.
+    container.querySelector = (sel) => (sel === '.tensix-viz-canvas' ? canvas : null)
+    // Make the deferred auto-play a no-op so the test schedules no real timer.
+    const hadRIC = 'requestIdleCallback' in globalThis
+    const prevRIC = globalThis.requestIdleCallback
+    globalThis.requestIdleCallback = () => 0
+    const qsaSpy = vi.spyOn(document, 'querySelectorAll')
+      .mockImplementation((sel) => (sel === '.tensix-viz-container' ? [container] : []))
+    try {
+      TensixViz.autoInit()
+      const first = container._tensixViz
+      expect(first).toBeTruthy()
+      TensixViz.autoInit()
+      expect(container._tensixViz).toBe(first)     // same instance, not a second TensixViz
+    } finally {
+      qsaSpy.mockRestore()
+      if (hadRIC) globalThis.requestIdleCallback = prevRIC
+      else delete globalThis.requestIdleCallback
+    }
+  })
 })

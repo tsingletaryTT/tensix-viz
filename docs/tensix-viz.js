@@ -1107,8 +1107,10 @@ var _TensixVizBundle = (() => {
       const stepBtn = container.querySelector(".tv-step");
       const legendEl = container.querySelector(".tv-legend");
       if (!canvas) return;
+      if (container._tensixViz) return;
       const arch = container.dataset.arch || "wormhole";
       const viz = new TensixViz(canvas, { arch });
+      container._tensixViz = viz;
       let script = [];
       try {
         script = JSON.parse(container.dataset.script || "[]");
