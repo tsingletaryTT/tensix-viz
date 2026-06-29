@@ -2,6 +2,24 @@
 
 All notable changes to tensix-viz are documented here.
 
+## [1.1.2] - 2026-06-29
+
+### Fixed
+
+- **`TensixViz.autoInit()` is idempotent for `.tensix-viz-container` elements** (`src/chip.js`)
+  1.1.1 made the `[data-viz]` path idempotent but left the legacy single-chip path unguarded. When
+  `autoInit()` ran twice (the bundle's self-init plus an explicit host-page call), each
+  `.tensix-viz-container` canvas received a second `TensixViz` instance — two animation loops drawing
+  on one canvas, which renders as a doubled/overlapping grid. `TensixViz.autoInit()` now skips any
+  container already initialized (`container._tensixViz`) and records the instance on it.
+
+### Added
+
+- **Responsive multi-chip canvas** (`tensix-viz.css`)
+  `.tv-chip-wrapper canvas { max-width: 100%; height: auto; }` — card/system canvases (created
+  without the `.tensix-viz-canvas` class) now scale to fit a narrow column instead of being clipped
+  by `.tv-card`'s overflow. Previously this rule had to be patched in by downstream consumers.
+
 ## [1.1.1] - 2026-06-25
 
 ### Fixed

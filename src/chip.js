@@ -1334,6 +1334,12 @@
 
       if (!canvas) return;
 
+      // Idempotent: autoInit may run more than once (bundle self-init + an
+      // explicit call from the host page). Skip containers already initialised
+      // so we don't stack a second TensixViz — and a second animation loop — on
+      // the same canvas, which renders as a doubled/overlapping grid.
+      if (container._tensixViz) return;
+
       const arch   = container.dataset.arch || 'wormhole';
       const viz    = new TensixViz(canvas, { arch });
 
@@ -1374,6 +1380,11 @@
           viz.next();
         });
       }
+
+      // Mark initialised only after synchronous setup has fully succeeded, so a
+      // throw above (e.g. renderLegend) leaves the container un-flagged and a
+      // later autoInit() can retry rather than skip a half-built widget.
+      container._tensixViz = viz;
     });
   };
 
