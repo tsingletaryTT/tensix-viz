@@ -428,6 +428,8 @@
       env = 0.85 + 0.15 * Math.sin(mem.phase * Math.PI * 2);
     }
 
+    const writebackAmt = (this._memOverride && this._memOverride.writeback !== undefined)
+                   ? this._memOverride.writeback : preset.writeback;
     const dramBw = (this._memOverride && this._memOverride.dram_bw !== undefined)
                    ? this._memOverride.dram_bw : preset.dram_bw;
     const l1Fill = (this._memOverride && this._memOverride.l1_fill !== undefined)
@@ -481,7 +483,8 @@
         });
       }
       // Writeback particle: compute → DRAM (write direction), separate probability roll.
-      if (preset.writeback > 0 && Math.random() < preset.writeback * spawnRate * 0.15) {
+      // Uses writebackAmt (setMemoryStats override when present, else the preset).
+      if (writebackAmt > 0 && Math.random() < writebackAmt * spawnRate * 0.15) {
         const wbFrom       = this._compute[Math.floor(Math.random() * this._compute.length)];
         const wbTo         = this._dram[Math.floor(Math.random() * this._dram.length)];
         const wbFromRect   = this._cellRect(wbFrom.col, wbFrom.row);
@@ -743,6 +746,9 @@
     this._memOverride = {};
     if (typeof stats.dram_bw === 'number') this._memOverride.dram_bw = Math.max(0, Math.min(1, stats.dram_bw));
     if (typeof stats.l1_fill === 'number') this._memOverride.l1_fill = Math.max(0, Math.min(1, stats.l1_fill));
+    // writeback: L1→DRAM (return) particle density — lets a live driver show
+    // BIDIRECTIONAL data flow, not just DRAM→L1 reads. Preset value used when omitted.
+    if (typeof stats.writeback === 'number') this._memOverride.writeback = Math.max(0, Math.min(1, stats.writeback));
   };
 
   TensixViz.prototype._runLoop = function () {
