@@ -618,7 +618,30 @@
         if (v > maxVal) maxVal = v;
       }
     }
+    // Normalise against a floored, slowly-decaying reference rather than this
+    // frame's raw maximum.
+    //
+    // Why: in `idle` almost every cell sits near zero and a handful pop at up
+    // to 0.35. Dividing by the raw per-frame max made whichever cell popped
+    // *this* frame render at v=1 -- full hot -- while its neighbours stayed
+    // cold. The next frame a different cell won, so the grid strobed. Measured
+    // on a four-chip booth panel: 4697 pixel-brightenings per second at rest,
+    // against 564 during an actual diffusion animation. It flickered worse
+    // idling than working.
+    //
+    // HEAT_FLOOR keeps a small pop small instead of promoting it to the top of
+    // the scale; the decay lets the reference fall smoothly once real activity
+    // stops, so a busy->idle transition fades instead of snapping.
+    var HEAT_FLOOR = 0.35;
+    var prevScale  = this._heatScale || 0;
+    this._heatScale = Math.max(maxVal, prevScale * 0.94, HEAT_FLOOR);
+
+    // The decay is updated BEFORE the empty-grid bail-out, deliberately. An
+    // earlier draft returned first, so the reference never fell in exactly the
+    // case it exists for -- activity having stopped. Its own regression test
+    // caught that ("expected 1 to be less than 1").
     if (maxVal === 0) return;
+    maxVal = this._heatScale;
 
     for (let row = cg.rowStart; row <= cg.rowEnd; row++) {
       for (let col = cg.colStart; col <= cg.colEnd; col++) {
@@ -1049,9 +1072,22 @@
       kdGlow:     0,   // current DRAM glow for kernel_dispatch (decays per frame)
     };
 
+    // Elapsed-time bookkeeping, shared with the mode functions below.
+    var _lastTickMs = 0;
+    var _dtScale    = 1;
+
     var MODES = {
       idle: function (c, r) {
-        return Math.min(1, prev[r][c] * 0.90 + (Math.random() < 0.03 ? Math.random() * 0.35 : 0));
+        // Frame-rate independent. These constants were tuned per *frame*, so
+        // the animation ran at whatever speed the display happened to refresh
+        // at: 10x faster wall-clock decay at 60Hz than at 6Hz, and ~2.4x the
+        // pop rate on a 144Hz panel. `_dtScale` is elapsed-time-in-60Hz-frames
+        // (1.0 at 60fps), so the original numbers still describe the intended
+        // look and now describe it at any refresh rate.
+        var k = (typeof _dtScale === 'number' && _dtScale > 0) ? _dtScale : 1;
+        var decay = Math.pow(0.90, k);
+        var pop   = 1 - Math.pow(1 - 0.03, k);
+        return Math.min(1, prev[r][c] * decay + (Math.random() < pop ? Math.random() * 0.35 : 0));
       },
       inference: function (c, r) {
         var wave = (t % 1) * W;
@@ -1189,6 +1225,15 @@
 
     function tick() {
       if (self._animGen !== gen) return;
+
+      // Real elapsed time, expressed in 60Hz-frame units so existing per-frame
+      // constants keep their meaning. Clamped so a backgrounded tab that
+      // resumes after seconds does not jump the animation.
+      var _now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now() : Date.now();
+      _dtScale = _lastTickMs ? Math.min((_now - _lastTickMs) / (1000 / 60), 6) : 1;
+      _lastTickMs = _now;
+
       t += 0.012;
 
       // Advance memory animation state (only when memory layer is enabled)
