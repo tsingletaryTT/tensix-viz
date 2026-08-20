@@ -233,10 +233,10 @@ var _TensixVizBundle = (() => {
     const pad = 8;
     const w = this._logicalW;
     const h = this._logicalH;
-    this._padX = pad;
-    this._padY = pad;
     this._cellW = Math.floor((w - pad * 2) / chip.cols);
     this._cellH = Math.floor((h - pad * 2) / chip.rows);
+    this._padX = Math.max(pad, Math.floor((w - this._cellW * chip.cols) / 2));
+    this._padY = Math.max(pad, Math.floor((h - this._cellH * chip.rows) / 2));
     this._dram = [];
     this._compute = [];
     for (var row = 0; row < chip.rows; row++) {

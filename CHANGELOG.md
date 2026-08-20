@@ -2,6 +2,18 @@
 
 All notable changes to tensix-viz are documented here.
 
+## [1.2.1] - 2026-08-20
+
+### Fixed
+
+- **The chip grid is centered within its canvas** (`src/chip.js`, `_computeLayout`).
+  `_cellW`/`_cellH` are floored, so `cols * _cellW` is usually smaller than the
+  drawable width; drawing from a fixed top-left `pad` piled all that leftover on
+  the right and bottom, making the grid look shoved toward the top-left corner
+  (visible in small multi-chip layouts). `_padX`/`_padY` now split the leftover
+  slack evenly — `max(pad, floor((w - cellW*cols) / 2))` — so the grid sits
+  centered, never narrower than the base pad on any edge. 86 tests green.
+
 ## [1.1.2] - 2026-06-29
 
 ### Fixed

@@ -249,10 +249,15 @@
     // Use logical (CSS-pixel) dimensions — _logicalW/H are set before DPR scaling.
     const w = this._logicalW;
     const h = this._logicalH;
-    this._padX  = pad;
-    this._padY  = pad;
     this._cellW = Math.floor((w - pad * 2) / chip.cols);
     this._cellH = Math.floor((h - pad * 2) / chip.rows);
+    // Center the grid within the canvas. _cellW/_cellH are floored (and can
+    // differ from each other), so cols*_cellW is usually < w - pad*2; drawing
+    // from a fixed top-left pad piled ALL that slack on the right/bottom, which
+    // read as the grid being shoved to the left. Split the leftover evenly so
+    // the grid sits centered, never narrower than the base pad on either edge.
+    this._padX  = Math.max(pad, Math.floor((w - this._cellW * chip.cols) / 2));
+    this._padY  = Math.max(pad, Math.floor((h - this._cellH * chip.rows) / 2));
 
     // Build cell-type lists used by _drawMemoryLayer() for glow and particle spawning.
     // Populated once per layout so _drawMemoryLayer does not rebuild them each frame.
