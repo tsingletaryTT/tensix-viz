@@ -72,8 +72,8 @@ describe('idle flicker', () => {
     // rate on a 144Hz monitor. Over one second of wall clock the amount of
     // decay should be about the same however many frames were drawn in it.
     //
-    // Driven through the module's own maths rather than a real RAF loop: the
-    // conversion under test is elapsed-time -> 60Hz-frame units.
+    // Driven through the same maths the module uses (without running a real RAF loop):
+    // the conversion under test is elapsed-time -> 60Hz-frame units.
     const decayOver = (frames, hz) => {
       let v = 1.0
       const k = 60 / hz            // 60Hz-frame units per actual frame
