@@ -14,6 +14,11 @@ All notable changes to tensix-viz are documented here.
   slack evenly — `max(pad, floor((w - cellW*cols) / 2))` — so the grid sits
   centered, never narrower than the base pad on any edge. 86 tests green.
 
+- **Idle rendering no longer flickers and is frame-rate independent** (`src/chip.js`, `_drawHeatmap`, `activate()` idle).
+  Heatmap normalization now uses a floored, slowly-decaying reference scale, and the idle decay/pop maths use elapsed time so behavior is consistent across refresh rates.
+  slack evenly — `max(pad, floor((w - cellW*cols) / 2))` — so the grid sits
+  centered, never narrower than the base pad on any edge. 86 tests green.
+
 ## [1.1.2] - 2026-06-29
 
 ### Fixed
