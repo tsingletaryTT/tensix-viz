@@ -1,6 +1,6 @@
 {
   "name": "tensix-viz",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Tenstorrent hardware topology visualizer — chip to cluster",
   "main": "tensix-viz.js",
   "module": "tensix-viz.esm.js",
