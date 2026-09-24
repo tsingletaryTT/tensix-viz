@@ -2,6 +2,23 @@
 
 All notable changes to tensix-viz are documented here.
 
+## [1.3.0] - 2026-09-24
+
+### Added
+
+- **`setActivity(value)` and `setProgress(value)`** (`src/chip.js`). Every
+  animation mode's brightness/pop-rate now scales with a live 0..1
+  `activity` signal via a shared `activityGain()` multiplier (floored at
+  0.12 so a resting chip never reads as dead), and `diffusion`/`video`/
+  `prefill`'s ring/sweep position can be driven by real structural progress
+  instead of wall-clock time via `setProgress()`. Both default to
+  reproducing the exact pre-1.3.0 output when never called — no existing
+  caller changes. Fixes the specific gap measured in `tt-bio-demo`'s
+  `ui/chipviz.py` docstring, where feeding a chip's canvas 0.0 vs. 1.0
+  activity produced pixel statistics indistinguishable from frame noise,
+  because the only prior telemetry input (`setMemoryStats`) never touched
+  the per-core heatmap itself.
+
 ## [1.2.1] - 2026-08-20
 
 ### Fixed
