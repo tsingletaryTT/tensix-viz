@@ -19,6 +19,24 @@ All notable changes to tensix-viz are documented here.
   because the only prior telemetry input (`setMemoryStats`) never touched
   the per-core heatmap itself.
 
+### Fixed
+
+- **`activityGain` now applies at the render layer, not the pre-normalisation
+  heatmap value** (`src/chip.js`, `_drawHeatmap`). The initial cut of the
+  above baked `activityGain` into each mode's own simulated value, which
+  `_drawHeatmap`'s per-frame renormalisation (to its own floored, decaying
+  maximum) canceled straight back out for any mode whose peak stayed above
+  `HEAT_FLOOR` (0.35) — every mode except `idle` at rest. `activity=0.5` and
+  `activity=1.0` rendered pixel-identical for `diffusion`/`thinking`/
+  `inference`/etc. Found by review before this version was consumed
+  anywhere. `activityGain` is now applied to `ctx.globalAlpha` at the point
+  a cell is actually filled — the one quantity nothing upstream rescales —
+  producing a real, uncancellable 8.33x swing in rendered opacity between
+  activity 0 and 1, uniformly across every mode. `tests/chip.test.js`'s
+  brightness tests now assert on that rendered alpha rather than the
+  pre-normalisation heatmap, which could not distinguish "gained but
+  canceled" from "not gained at all."
+
 ## [1.2.1] - 2026-08-20
 
 ### Fixed
