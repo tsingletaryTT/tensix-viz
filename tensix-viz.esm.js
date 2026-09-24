@@ -136,6 +136,10 @@ var MEM_PRESETS = {
   explore: { dram_bw: 0.3, l1_fill: 0.35, burst: false, burstHz: 0, writeback: 0, loadColor: "load" },
   kernel_dispatch: { dram_bw: 0.15, l1_fill: 0.55, burst: true, burstHz: "kd", writeback: 0.5, loadColor: "burst" }
 };
+function activityGain(activity) {
+  var a = Math.max(0, Math.min(1, activity));
+  return 0.12 + 0.88 * a;
+}
 function TensixViz(canvas, opts) {
   opts = opts || {};
   this.canvas = canvas;
@@ -159,6 +163,10 @@ function TensixViz(canvas, opts) {
   this._memOverride = null;
   this._memPhase = null;
   this._currentMode = null;
+  this._activityTarget = 1;
+  this._activityCurrent = 1;
+  this._progressTarget = null;
+  this._progressCurrent = null;
   this._cellW = 0;
   this._cellH = 0;
   this._padX = 0;
@@ -487,6 +495,7 @@ TensixViz.prototype._drawHeatmap = function() {
   this._heatScale = Math.max(maxVal, prevScale * 0.94, HEAT_FLOOR);
   if (maxVal === 0) return;
   maxVal = this._heatScale;
+  const gain = activityGain(this._activityCurrent);
   for (let row = cg.rowStart; row <= cg.rowEnd; row++) {
     for (let col = cg.colStart; col <= cg.colEnd; col++) {
       if (chip.coreType(col, row) !== "tensix") continue;
@@ -494,7 +503,7 @@ TensixViz.prototype._drawHeatmap = function() {
       const r = this._cellRect(col, row);
       const color = this._heatColor(v, this._theme);
       ctx.save();
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.6 * gain;
       ctx.fillStyle = color;
       this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
       ctx.fill();
@@ -591,6 +600,10 @@ TensixViz.prototype.reset = function() {
   this._memOverride = null;
   this._memPhase = null;
   this._currentMode = null;
+  this._activityTarget = 1;
+  this._activityCurrent = 1;
+  this._progressTarget = null;
+  this._progressCurrent = null;
   this._scriptQueue = [];
   this._resolveStep = null;
   this.render();
@@ -601,6 +614,18 @@ TensixViz.prototype.setMemoryStats = function(stats) {
   if (typeof stats.dram_bw === "number") this._memOverride.dram_bw = Math.max(0, Math.min(1, stats.dram_bw));
   if (typeof stats.l1_fill === "number") this._memOverride.l1_fill = Math.max(0, Math.min(1, stats.l1_fill));
   if (typeof stats.writeback === "number") this._memOverride.writeback = Math.max(0, Math.min(1, stats.writeback));
+};
+TensixViz.prototype.setActivity = function(value) {
+  if (typeof value !== "number" || !isFinite(value)) return;
+  this._activityTarget = Math.max(0, Math.min(1, value));
+};
+TensixViz.prototype.setProgress = function(value) {
+  if (value === null) {
+    this._progressTarget = null;
+    return;
+  }
+  if (typeof value !== "number" || !isFinite(value)) return;
+  this._progressTarget = Math.max(0, Math.min(1, value));
 };
 TensixViz.prototype._runLoop = function() {
   const self = this;
@@ -865,6 +890,9 @@ TensixViz.prototype.activate = function(mode, opts) {
   };
   var _lastTickMs = 0;
   var _dtScale = 1;
+  function activePhase(wallClockPhase) {
+    return self._progressCurrent !== null ? self._progressCurrent : wallClockPhase;
+  }
   var MODES = {
     idle: function(c2, r2) {
       var k = typeof _dtScale === "number" && _dtScale > 0 ? _dtScale : 1;
@@ -879,7 +907,7 @@ TensixViz.prototype.activate = function(mode, opts) {
     diffusion: function(c2, r2) {
       var cx = W / 2, cy = H / 2;
       var dist = Math.sqrt((c2 - cx) * (c2 - cx) + (r2 - cy) * (r2 - cy));
-      var ring = t % 1 * Math.sqrt(cx * cx + cy * cy);
+      var ring = activePhase(t % 1) * Math.sqrt(cx * cx + cy * cy);
       return Math.max(0, 1 - Math.abs(dist - ring) / 2) * 0.9;
     },
     agents: function(c2, r2) {
@@ -893,15 +921,16 @@ TensixViz.prototype.activate = function(mode, opts) {
       return (Math.sin(t * Math.PI * 0.7 + c2 * 0.18 + r2 * 0.12) + 1) / 2 * 0.4 + 0.45;
     },
     prefill: function(c2, r2) {
-      var wave = t * 1.5 % 1 * (W + 6) - 3;
+      var wave = activePhase(t * 1.5 % 1) * (W + 6) - 3;
       return Math.max(0, 1 - Math.abs(c2 - wave) / (W * 0.5)) * 0.95;
     },
     video: function(c2, r2) {
       var cx = W / 2, cy = H / 2;
       var dist = Math.sqrt((c2 - cx) * (c2 - cx) + (r2 - cy) * (r2 - cy));
       var maxR = Math.sqrt(cx * cx + cy * cy);
-      var r1 = Math.max(0, 1 - Math.abs(dist - t % 1 * maxR) / 1.8) * 0.9;
-      var r22 = Math.max(0, 1 - Math.abs(dist - (t + 0.5) % 1 * maxR) / 1.8) * 0.9;
+      var basePhase = t % 1;
+      var r1 = Math.max(0, 1 - Math.abs(dist - activePhase(basePhase) * maxR) / 1.8) * 0.9;
+      var r22 = Math.max(0, 1 - Math.abs(dist - activePhase((basePhase + 0.5) % 1) * maxR) / 1.8) * 0.9;
       return Math.max(r1, r22);
     },
     batch: function(c2, r2) {
@@ -975,6 +1004,14 @@ TensixViz.prototype.activate = function(mode, opts) {
     var _now = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
     _dtScale = _lastTickMs ? Math.min((_now - _lastTickMs) / (1e3 / 60), 6) : 1;
     _lastTickMs = _now;
+    var _ease = 1 - Math.pow(0.5, _dtScale / 24);
+    self._activityCurrent += (self._activityTarget - self._activityCurrent) * _ease;
+    if (self._progressTarget !== null) {
+      if (self._progressCurrent === null) self._progressCurrent = self._progressTarget;
+      self._progressCurrent += (self._progressTarget - self._progressCurrent) * _ease;
+    } else {
+      self._progressCurrent = null;
+    }
     t += 0.012;
     if (self._showMemory) {
       _mem.phase += 0.012;
@@ -1052,6 +1089,7 @@ TensixViz.prototype.render = function() {
     ctx.fillText(text, cx, cy);
   }
 };
+TensixViz.activityGain = activityGain;
 TensixViz.makeParallelismScript = function(totalCores, serialFraction) {
   serialFraction = serialFraction || 0.1;
   const steps = [];

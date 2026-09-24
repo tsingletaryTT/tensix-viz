@@ -160,6 +160,16 @@
     kernel_dispatch: { dram_bw: 0.15, l1_fill: 0.55, burst: true,  burstHz: 'kd', writeback: 0.50, loadColor: 'burst' },
   };
 
+  // ─── Activity gain ──────────────────────────────────────────────────────────
+  // Shared multiplier every mode's brightness/pop-rate passes through. Floored
+  // at 0.12 so a genuinely idle chip reads as "resting," not "the panel died";
+  // returns exactly 1 at activity=1 so a caller that never calls setActivity()
+  // sees today's exact output.
+  function activityGain(activity) {
+    var a = Math.max(0, Math.min(1, activity));
+    return 0.12 + 0.88 * a;
+  }
+
   // ─── TensixViz class ───────────────────────────────────────────────────────
   function TensixViz(canvas, opts) {
     opts = opts || {};
@@ -186,6 +196,10 @@
     this._memOverride = null;                  // set by setMemoryStats(); null = use preset
     this._memPhase    = null;                  // set by activate(); null until first tick
     this._currentMode = null;                  // set by activate(); used by _drawMemoryLayer
+    this._activityTarget  = 1;    // desired activity (0..1); 1 = today's behavior
+    this._activityCurrent = 1;    // eased value MODES actually read
+    this._progressTarget  = null; // desired progress (0..1); null = wall-clock phase
+    this._progressCurrent = null;
 
     this._cellW   = 0;
     this._cellH   = 0;
@@ -648,6 +662,18 @@
     if (maxVal === 0) return;
     maxVal = this._heatScale;
 
+    // `activityGain` is applied HERE, to the rendered alpha, and nowhere
+    // upstream in the per-cell simulated value. Baking it into a mode's own
+    // heatmap value was tried first and does not survive this function: the
+    // normalisation two lines up re-scales every frame so its own maximum
+    // fills the visible range, which cancels any gain that leaves the peak
+    // above HEAT_FLOOR (i.e. any activity above ~0.3 for a mode whose
+    // uncompressed peak sits around 0.9) -- the frame looks identical at
+    // activity 0.5 and 1.0. Alpha is the one quantity nothing above this
+    // point rescales, so it is the only place a real, uncancellable
+    // brightness difference can be produced. At activity=1, gain=1 and
+    // every rendered alpha is bit-identical to before this existed.
+    const gain = activityGain(this._activityCurrent);
     for (let row = cg.rowStart; row <= cg.rowEnd; row++) {
       for (let col = cg.colStart; col <= cg.colEnd; col++) {
         if (chip.coreType(col, row) !== 'tensix') continue;
@@ -655,7 +681,7 @@
         const r    = this._cellRect(col, row);
         const color = this._heatColor(v, this._theme);
         ctx.save();
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.6 * gain;
         ctx.fillStyle   = color;
         this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
         ctx.fill();
@@ -759,6 +785,10 @@
     this._memOverride = null;
     this._memPhase    = null;
     this._currentMode = null;
+    this._activityTarget  = 1;
+    this._activityCurrent = 1;
+    this._progressTarget  = null;
+    this._progressCurrent = null;
     this._scriptQueue   = [];
     this._resolveStep   = null;
     this.render();
@@ -777,6 +807,34 @@
     // writeback: L1→DRAM (return) particle density — lets a live driver show
     // BIDIRECTIONAL data flow, not just DRAM→L1 reads. Preset value used when omitted.
     if (typeof stats.writeback === 'number') this._memOverride.writeback = Math.max(0, Math.min(1, stats.writeback));
+  };
+
+  // ─── Activity / progress overrides ─────────────────────────────────────────
+  // Call with live signal after activate(): setActivity() says how LOADED this
+  // chip is right now (0 quiet .. 1 fully loaded) and modulates every mode's
+  // brightness ceiling via activityGain(). setProgress() says how far through
+  // its current structural cycle it is (a denoising step count, a refinement
+  // cycle) and, for the modes whose position is a single 0..1 sweep
+  // (diffusion/video/prefill), replaces the wall-clock phase with it. Both
+  // default to reproducing today's exact wall-clock-only behavior when never
+  // called (activity=1, progress=null), and both ease toward the value handed
+  // in rather than snapping, so a once-a-second poll does not step visibly.
+  // Cleared by reset() (and therefore by activate()).
+  TensixViz.prototype.setActivity = function (value) {
+    if (typeof value !== 'number' || !isFinite(value)) return;
+    this._activityTarget = Math.max(0, Math.min(1, value));
+  };
+
+  TensixViz.prototype.setProgress = function (value) {
+    // `null` explicitly clears a prior override, falling back to the
+    // mode's own wall-clock phase — the only way to do so short of a full
+    // reset()/activate(). Without it, a caller that stops sending progress
+    // (e.g. a chip whose stage no longer has one, or whose telemetry
+    // becomes momentarily unavailable) leaves the ring permanently pinned
+    // at its last real value instead of resuming motion.
+    if (value === null) { this._progressTarget = null; return; }
+    if (typeof value !== 'number' || !isFinite(value)) return;
+    this._progressTarget = Math.max(0, Math.min(1, value));
   };
 
   TensixViz.prototype._runLoop = function () {
@@ -1081,6 +1139,14 @@
     var _lastTickMs = 0;
     var _dtScale    = 1;
 
+    // Substitutes the live progress value for a mode's own wall-clock phase
+    // when a caller has provided one via setProgress() — same formula, only
+    // the phase source changes. Falls back to the wall-clock value untouched
+    // when no live progress has been set.
+    function activePhase(wallClockPhase) {
+      return (self._progressCurrent !== null) ? self._progressCurrent : wallClockPhase;
+    }
+
     var MODES = {
       idle: function (c, r) {
         // Frame-rate independent. These constants were tuned per *frame*, so
@@ -1101,7 +1167,7 @@
       diffusion: function (c, r) {
         var cx = W / 2, cy = H / 2;
         var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
-        var ring = (t % 1) * Math.sqrt(cx * cx + cy * cy);
+        var ring = activePhase(t % 1) * Math.sqrt(cx * cx + cy * cy);
         return Math.max(0, 1 - Math.abs(dist - ring) / 2) * 0.9;
       },
       agents: function (c, r) {
@@ -1120,7 +1186,7 @@
       prefill: function (c, r) {
         // Prompt ingestion — all tokens processed in parallel. Wide bright band
         // sweeps the full grid quickly (high utilisation, short burst per cycle).
-        var wave = (t * 1.5 % 1) * (W + 6) - 3;
+        var wave = activePhase(t * 1.5 % 1) * (W + 6) - 3;
         return Math.max(0, 1 - Math.abs(c - wave) / (W * 0.5)) * 0.95;
       },
       video: function (c, r) {
@@ -1129,8 +1195,9 @@
         var cx = W / 2, cy = H / 2;
         var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         var maxR = Math.sqrt(cx * cx + cy * cy);
-        var r1   = Math.max(0, 1 - Math.abs(dist - (t          % 1) * maxR) / 1.8) * 0.9;
-        var r2   = Math.max(0, 1 - Math.abs(dist - ((t + 0.5)  % 1) * maxR) / 1.8) * 0.9;
+        var basePhase = t % 1;
+        var r1 = Math.max(0, 1 - Math.abs(dist - activePhase(basePhase) * maxR) / 1.8) * 0.9;
+        var r2 = Math.max(0, 1 - Math.abs(dist - activePhase((basePhase + 0.5) % 1) * maxR) / 1.8) * 0.9;
         return Math.max(r1, r2);
       },
       batch: function (c, r) {
@@ -1239,6 +1306,17 @@
       _dtScale = _lastTickMs ? Math.min((_now - _lastTickMs) / (1000 / 60), 6) : 1;
       _lastTickMs = _now;
 
+      // Ease activity/progress toward their targets at a rate independent of
+      // refresh rate (same _dtScale unit idle's own decay uses). ~0.4s half-life.
+      var _ease = 1 - Math.pow(0.5, _dtScale / 24);
+      self._activityCurrent += (self._activityTarget - self._activityCurrent) * _ease;
+      if (self._progressTarget !== null) {
+        if (self._progressCurrent === null) self._progressCurrent = self._progressTarget;
+        self._progressCurrent += (self._progressTarget - self._progressCurrent) * _ease;
+      } else {
+        self._progressCurrent = null;
+      }
+
       t += 0.012;
 
       // Advance memory animation state (only when memory layer is enabled)
@@ -1335,6 +1413,8 @@
   };
 
   // ─── Static factory helpers ─────────────────────────────────────────────────
+
+  TensixViz.activityGain = activityGain;
 
   // Build a parallelism script: animate adding cores 1 → N showing serial fraction
   TensixViz.makeParallelismScript = function (totalCores, serialFraction) {

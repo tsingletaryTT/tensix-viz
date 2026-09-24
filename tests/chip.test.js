@@ -353,3 +353,258 @@ describe('TensixViz._drawHeatmap tensix-only guard', () => {
     expect(globalAlphas.length).toBeGreaterThan(0)
   })
 })
+
+describe('activityGain', () => {
+  it('returns exactly 1 at activity=1 (today\'s behavior, unchanged)', () => {
+    expect(TensixViz.activityGain(1)).toBe(1)
+  })
+
+  it('floors at 0.12, never fully dark', () => {
+    expect(TensixViz.activityGain(0)).toBeCloseTo(0.12, 10)
+  })
+
+  it('is linear between the floor and 1', () => {
+    expect(TensixViz.activityGain(0.5)).toBeCloseTo(0.56, 10)
+  })
+
+  it('clamps out-of-range input', () => {
+    expect(TensixViz.activityGain(2)).toBe(1)
+    expect(TensixViz.activityGain(-1)).toBeCloseTo(0.12, 10)
+  })
+})
+
+describe('setActivity / setProgress', () => {
+  it('defaults to activity=1, progress=null before any call', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    expect(viz._activityTarget).toBe(1)
+    expect(viz._progressTarget).toBeNull()
+  })
+
+  it('clamps setActivity to [0,1]', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setActivity(2)
+    expect(viz._activityTarget).toBe(1)
+    viz.setActivity(-1)
+    expect(viz._activityTarget).toBe(0)
+    viz.setActivity(0.42)
+    expect(viz._activityTarget).toBeCloseTo(0.42, 10)
+  })
+
+  it('ignores non-numeric setActivity input', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setActivity(0.7)
+    viz.setActivity('busy')
+    viz.setActivity(NaN)
+    expect(viz._activityTarget).toBeCloseTo(0.7, 10)
+  })
+
+  it('clamps setProgress to [0,1] and ignores non-numeric input', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setProgress(1.5)
+    expect(viz._progressTarget).toBe(1)
+    viz.setProgress(-0.5)
+    expect(viz._progressTarget).toBe(0)
+    viz.setProgress('nope')
+    expect(viz._progressTarget).toBe(0)
+  })
+
+  it('reset() restores activity/progress to their defaults', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setActivity(0.1)
+    viz.setProgress(0.9)
+    viz.reset()
+    expect(viz._activityTarget).toBe(1)
+    expect(viz._progressTarget).toBeNull()
+  })
+
+  it('activate() eases _activityCurrent toward a target set before it ticks', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('idle')
+    viz.setActivity(0)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    // Started at 1 (activate()'s reset default), eased toward 0 — must have
+    // moved substantially within ~6 ticks (100ms / 16ms setTimeout rAF).
+    expect(viz._activityCurrent).toBeLessThan(0.9)
+    expect(viz._activityCurrent).toBeGreaterThanOrEqual(0)
+    viz.reset()
+  })
+})
+
+describe('activityGain applied at the render layer (globalAlpha)', () => {
+  // Deliberately NOT asserting on the pre-normalisation `_heatmap` value.
+  // `_drawHeatmap` normalises each frame to its own floored, decaying
+  // maximum (`_heatScale`) — baking activityGain into a mode's raw value
+  // is invisible on screen for any mode whose peak stays above HEAT_FLOOR
+  // (0.35) at the tested activity, because the normalisation divides the
+  // gain straight back out. `ctx.globalAlpha` at the moment of `fill()` is
+  // the one quantity nothing upstream rescales, so it is what these tests
+  // check — the actual value the canvas would draw.
+  const ALL_MODES = ['idle', 'inference', 'diffusion', 'thinking', 'explore',
+    'prefill', 'video', 'batch', 'kernel_dispatch', 'agents']
+
+  async function maxRenderedAlpha(mode, activity) {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate(mode)
+    // Let the heatmap populate before measuring; activity is then set
+    // directly (bypassing the eased ramp, which has its own test in
+    // "setActivity / setProgress") so this test isolates the alpha math.
+    await new Promise(resolve => setTimeout(resolve, 100))
+    viz._activityCurrent = activity
+    const ctx = viz.ctx
+    let maxAlpha = 0
+    ctx.fill = () => { maxAlpha = Math.max(maxAlpha, ctx.globalAlpha) }
+    viz._drawHeatmap()
+    viz.reset()
+    return maxAlpha
+  }
+
+  ALL_MODES.forEach((mode) => {
+    it(`${mode}: activity=1 renders today's fixed alpha (0.6); activity=0 is measurably dimmer`, async () => {
+      const bright = await maxRenderedAlpha(mode, 1)
+      const dim = await maxRenderedAlpha(mode, 0)
+      // At activity=1, activityGain(1)=1 exactly, so alpha must be
+      // bit-identical to the pre-existing fixed 0.6 — the backward-
+      // compatibility claim, pinned at the render layer.
+      expect(bright).toBeCloseTo(0.6, 10)
+      // At activity=0, activityGain(0)=0.12 exactly.
+      expect(dim).toBeCloseTo(0.6 * 0.12, 10)
+      // activityGain(0) / activityGain(1) = 0.12/1 = 0.12, so the dim alpha
+      // must be well under the bright alpha's ceiling — this is the exact
+      // gap chipviz.py's own docstring measured as "less than frame noise"
+      // before this change; asserting a comfortable margin (half) makes the
+      // test robust to per-mode noise while still catching a no-op gain.
+      expect(dim).toBeLessThan(bright * 0.5)
+    })
+  })
+})
+
+describe('setProgress drives ring/sweep position directly', () => {
+  it('diffusion: with progress pinned near 0, the ring sits near the center regardless of elapsed wall-clock time', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    viz.setProgress(0.02)
+    // Long enough that a wall-clock-driven ring (t % 1, full cycle ~1.3s)
+    // would have moved well away from the center by now — this is what
+    // makes the assertion below discriminate the fix from no-fix, rather
+    // than passing by coincidence of sampling near t%1≈0.
+    await new Promise(resolve => setTimeout(resolve, 800))
+    const cg = viz.chip.computeGrid
+    // Matches the mode function's own center exactly: relative cx/cy = W/2,
+    // H/2, rounded to the nearest cell and offset into absolute coordinates.
+    const relCx = (cg.colEnd - cg.colStart + 1) / 2
+    const relCy = (cg.rowEnd - cg.rowStart + 1) / 2
+    const col = cg.colStart + Math.round(relCx)
+    const row = cg.rowStart + Math.round(relCy)
+    const centerVal = viz._heatmap[row][col]
+    // At progress≈0.02 the ring radius is small, so the center cell (dist≈0)
+    // sits near the ring and should be near its brightness ceiling (~0.9 at
+    // full activity) however long the wall clock has run.
+    expect(centerVal).toBeGreaterThan(0.7)
+    viz.reset()
+  })
+
+  it('diffusion: pinning progress overrides wall-clock motion between ticks', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    viz.setProgress(0.5)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const first = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const second = JSON.stringify(viz._heatmap)
+    // Wall-clock-driven diffusion would keep moving the ring every tick;
+    // pinned progress (no further setProgress call, target unchanged) means
+    // _progressCurrent has already converged and the ring holds still.
+    expect(first).toBe(second)
+    viz.reset()
+  })
+
+  it('prefill and video accept setProgress without throwing and produce a heatmap', async () => {
+    for (const mode of ['prefill', 'video']) {
+      const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+      viz.activate(mode)
+      viz.setProgress(0.3)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      expect(viz._heatmap).not.toBeNull()
+      viz.reset()
+    }
+  })
+
+  it('thinking ignores setProgress (documented non-goal — phase stays wall-clock)', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('thinking')
+    viz.setProgress(0.5)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const first = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const second = JSON.stringify(viz._heatmap)
+    // thinking's phase is wall-clock-only regardless of setProgress, so two
+    // samples taken apart in time must differ (the wave keeps moving).
+    expect(first).not.toBe(second)
+    viz.reset()
+  })
+})
+
+describe('no mode function applies its own activityGain', () => {
+  // activityGain must live in exactly one place: _drawHeatmap's rendered
+  // alpha (see "activityGain applied at the render layer"). A mode function
+  // that also multiplies its own pre-normalisation value double-scales at
+  // low activity, because that self-multiplication can push the mode's own
+  // peak below HEAT_FLOOR, changing how _drawHeatmap's normalisation treats
+  // it -- exactly what happened when kernel_dispatch kept a leftover
+  // `* activityGain(...)` from an earlier draft of the render-layer fix.
+  // Behavioral testing of this through kernel_dispatch's own multi-kernel
+  // stochastic simulation is unreliable (kernel age/dispatch timing varies
+  // run to run independent of activity), so this pins the invariant at the
+  // source level instead: no mode body may reference activityGain.
+  it('the MODES table never calls activityGain (only _drawHeatmap does)', async () => {
+    const fs = await import('fs')
+    const src = fs.readFileSync(new URL('../src/chip.js', import.meta.url), 'utf8')
+    const start = src.indexOf('var MODES = {')
+    const end = src.indexOf('\n    var fn = MODES[mode];')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const modesBody = src.slice(start, end)
+    expect(modesBody).not.toContain('activityGain')
+  })
+})
+
+describe('setProgress(null) clears a stale override', () => {
+  it('falls back to the wall-clock phase after setProgress(null)', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    viz.setProgress(0.5)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const pinned1 = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const pinned2 = JSON.stringify(viz._heatmap)
+    // Sanity: progress really is pinned before clearing it.
+    expect(pinned1).toBe(pinned2)
+
+    viz.setProgress(null)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const cleared1 = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const cleared2 = JSON.stringify(viz._heatmap)
+    // Once cleared, the wall clock is moving again, so two samples taken
+    // apart in time must differ -- the same discriminator the "overrides
+    // wall-clock motion" test uses for the pinned case, inverted.
+    expect(cleared1).not.toBe(cleared2)
+    viz.reset()
+  })
+
+  it('setProgress(null) is a no-op when progress was never set', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    expect(() => viz.setProgress(null)).not.toThrow()
+    expect(viz._progressTarget).toBeNull()
+    viz.reset()
+  })
+
+  it('still rejects non-numeric, non-null input', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setProgress(0.4)
+    viz.setProgress('nope')
+    expect(viz._progressTarget).toBeCloseTo(0.4, 10)
+    viz.reset()
+  })
+})

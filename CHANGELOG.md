@@ -2,6 +2,62 @@
 
 All notable changes to tensix-viz are documented here.
 
+## [1.3.0] - 2026-09-24
+
+### Added
+
+- **`setActivity(value)` and `setProgress(value)`** (`src/chip.js`). Every
+  animation mode's brightness/pop-rate now scales with a live 0..1
+  `activity` signal via a shared `activityGain()` multiplier (floored at
+  0.12 so a resting chip never reads as dead), and `diffusion`/`video`/
+  `prefill`'s ring/sweep position can be driven by real structural progress
+  instead of wall-clock time via `setProgress()`. Both default to
+  reproducing the exact pre-1.3.0 output when never called — no existing
+  caller changes. This is the library-side half of a fix for a gap
+  `tt-bio-demo`'s `ui/chipviz.py` docstring had measured and documented
+  (feeding a chip's canvas 0.0 vs. 1.0 activity produced pixel statistics
+  indistinguishable from frame noise, because the only prior telemetry
+  input, `setMemoryStats`, never touched the per-core heatmap itself) —
+  closing it in practice also requires a consumer to call these new
+  setters, which is `tt-bio-demo`'s own change (its `ui/chipviz.py` and
+  `ui/app.py`, in that repo, not this checkout).
+
+### Fixed
+
+- **`activityGain` now applies at the render layer, not the pre-normalisation
+  heatmap value** (`src/chip.js`, `_drawHeatmap`). The initial cut of the
+  above baked `activityGain` into each mode's own simulated value, which
+  `_drawHeatmap`'s per-frame renormalisation (to its own floored, decaying
+  maximum) canceled straight back out for any mode whose peak stayed above
+  `HEAT_FLOOR` (0.35) — every mode except `idle` at rest. `activity=0.5` and
+  `activity=1.0` rendered pixel-identical for `diffusion`/`thinking`/
+  `inference`/etc. Found by review before this version was consumed
+  anywhere. `activityGain` is now applied to `ctx.globalAlpha` at the point
+  a cell is actually filled — the one quantity nothing upstream rescales —
+  producing a real, uncancellable 8.33x swing in rendered opacity between
+  activity 0 and 1, uniformly across every mode. `tests/chip.test.js`'s
+  brightness tests now assert on that rendered alpha rather than the
+  pre-normalisation heatmap, which could not distinguish "gained but
+  canceled" from "not gained at all."
+
+- **`kernel_dispatch` no longer double-applies `activityGain`** (`src/chip.js`).
+  A leftover `* activityGain(...)` from before the render-layer fix above was
+  still multiplying this mode's own pre-normalisation value, on top of the
+  now-correct alpha-layer application — dimming it twice at low activity,
+  unlike every other mode. Found in GitHub Copilot's review of the PR.
+  Pinned with a source-level invariant test (no mode body may reference
+  `activityGain`) rather than a behavioral one, since `kernel_dispatch`'s
+  stochastic multi-kernel simulation makes timing-based assertions
+  unreliable.
+
+- **`setProgress(null)` now clears a stale progress override** (`src/chip.js`).
+  Previously there was no way to return to the wall-clock fallback once
+  `setProgress` had been called with a real value — a caller that simply
+  stopped sending progress (a chip whose stage no longer has one, or whose
+  telemetry becomes momentarily unavailable) left the ring permanently
+  pinned at its last value instead of resuming motion, contradicting the
+  documented fallback behavior. Also found in review.
+
 ## [1.2.1] - 2026-08-20
 
 ### Fixed
