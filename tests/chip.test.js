@@ -429,3 +429,41 @@ describe('setActivity / setProgress', () => {
     viz.reset()
   })
 })
+
+describe('activityGain applied to mode brightness', () => {
+  const DETERMINISTIC_MODES = ['inference', 'diffusion', 'thinking', 'explore',
+    'prefill', 'video', 'batch', 'kernel_dispatch']
+
+  async function peakHeat(mode, activity) {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate(mode)
+    viz.setActivity(activity)
+    // Easing (Task 1) has a deliberate ~0.4s half-life for smooth production
+    // motion, which a short test window can't wait out. Setting the eased
+    // value directly isolates what THIS test checks — activityGain's effect
+    // on brightness — from the easing dynamics, which have their own test.
+    viz._activityCurrent = activity
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const hmap = viz._heatmap
+    let peak = 0
+    for (const row of hmap) {
+      if (!row) continue
+      for (const v of row) if (typeof v === 'number' && v > peak) peak = v
+    }
+    viz.reset()
+    return peak
+  }
+
+  DETERMINISTIC_MODES.forEach((mode) => {
+    it(`${mode}: low activity renders measurably dimmer than full activity`, async () => {
+      const dim = await peakHeat(mode, 0)
+      const bright = await peakHeat(mode, 1)
+      // activityGain(0) / activityGain(1) = 0.12/1 = 0.12, so the dim peak
+      // must be well under the bright peak's ceiling — this is the exact
+      // gap chipviz.py's own docstring measured as "less than frame noise"
+      // before this change; asserting a comfortable margin (half) makes the
+      // test robust to per-mode noise while still catching a no-op gain.
+      expect(dim).toBeLessThan(bright * 0.5)
+    })
+  })
+})
