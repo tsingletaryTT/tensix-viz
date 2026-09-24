@@ -662,6 +662,18 @@
     if (maxVal === 0) return;
     maxVal = this._heatScale;
 
+    // `activityGain` is applied HERE, to the rendered alpha, and nowhere
+    // upstream in the per-cell simulated value. Baking it into a mode's own
+    // heatmap value was tried first and does not survive this function: the
+    // normalisation two lines up re-scales every frame so its own maximum
+    // fills the visible range, which cancels any gain that leaves the peak
+    // above HEAT_FLOOR (i.e. any activity above ~0.3 for a mode whose
+    // uncompressed peak sits around 0.9) -- the frame looks identical at
+    // activity 0.5 and 1.0. Alpha is the one quantity nothing above this
+    // point rescales, so it is the only place a real, uncancellable
+    // brightness difference can be produced. At activity=1, gain=1 and
+    // every rendered alpha is bit-identical to before this existed.
+    const gain = activityGain(this._activityCurrent);
     for (let row = cg.rowStart; row <= cg.rowEnd; row++) {
       for (let col = cg.colStart; col <= cg.colEnd; col++) {
         if (chip.coreType(col, row) !== 'tensix') continue;
@@ -669,7 +681,7 @@
         const r    = this._cellRect(col, row);
         const color = this._heatColor(v, this._theme);
         ctx.save();
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.6 * gain;
         ctx.fillStyle   = color;
         this._roundRect(ctx, r.x, r.y, r.w, r.h, 3);
         ctx.fill();
@@ -1137,40 +1149,38 @@
         // (1.0 at 60fps), so the original numbers still describe the intended
         // look and now describe it at any refresh rate.
         var k = (typeof _dtScale === 'number' && _dtScale > 0) ? _dtScale : 1;
-        var gain  = activityGain(self._activityCurrent);
         var decay = Math.pow(0.90, k);
-        var pop   = (1 - Math.pow(1 - 0.03, k)) * gain;
-        return Math.min(1, prev[r][c] * decay + (Math.random() < pop ? Math.random() * 0.35 * gain : 0));
+        var pop   = 1 - Math.pow(1 - 0.03, k);
+        return Math.min(1, prev[r][c] * decay + (Math.random() < pop ? Math.random() * 0.35 : 0));
       },
       inference: function (c, r) {
         var wave = (t % 1) * W;
-        return Math.max(0, 1 - Math.abs(c - wave) / 3) * 0.9 * activityGain(self._activityCurrent);
+        return Math.max(0, 1 - Math.abs(c - wave) / 3) * 0.9;
       },
       diffusion: function (c, r) {
         var cx = W / 2, cy = H / 2;
         var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         var ring = activePhase(t % 1) * Math.sqrt(cx * cx + cy * cy);
-        return Math.max(0, 1 - Math.abs(dist - ring) / 2) * 0.9 * activityGain(self._activityCurrent);
+        return Math.max(0, 1 - Math.abs(dist - ring) / 2) * 0.9;
       },
       agents: function (c, r) {
-        var gain = activityGain(self._activityCurrent);
-        return Math.min(1, prev[r][c] * 0.85 + (Math.random() < 0.06 * gain ? Math.random() * 0.8 * gain : 0));
+        return Math.min(1, prev[r][c] * 0.85 + (Math.random() < 0.06 ? Math.random() * 0.8 : 0));
       },
       explore: function (c, r) {
-        return (Math.sin(c * 0.6 + t * Math.PI * 4) * Math.cos(r * 0.4 + t * Math.PI * 2) + 1) / 2 * 0.85 * activityGain(self._activityCurrent);
+        return (Math.sin(c * 0.6 + t * Math.PI * 4) * Math.cos(r * 0.4 + t * Math.PI * 2) + 1) / 2 * 0.85;
       },
       // ── LLM-specific states ──────────────────────────────────────────────────
       thinking: function (c, r) {
         // Chain-of-thought / extended reasoning — sustained full-grid glow with
         // slow gentle oscillation. All cores moderately active; occasional
         // brighter wave as the model "considers" a new reasoning step.
-        return ((Math.sin(t * Math.PI * 0.7 + c * 0.18 + r * 0.12) + 1) / 2 * 0.4 + 0.45) * activityGain(self._activityCurrent);
+        return (Math.sin(t * Math.PI * 0.7 + c * 0.18 + r * 0.12) + 1) / 2 * 0.4 + 0.45;
       },
       prefill: function (c, r) {
         // Prompt ingestion — all tokens processed in parallel. Wide bright band
         // sweeps the full grid quickly (high utilisation, short burst per cycle).
         var wave = activePhase(t * 1.5 % 1) * (W + 6) - 3;
-        return Math.max(0, 1 - Math.abs(c - wave) / (W * 0.5)) * 0.95 * activityGain(self._activityCurrent);
+        return Math.max(0, 1 - Math.abs(c - wave) / (W * 0.5)) * 0.95;
       },
       video: function (c, r) {
         // Temporal diffusion — two phase-offset expanding rings simulating
@@ -1178,20 +1188,18 @@
         var cx = W / 2, cy = H / 2;
         var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         var maxR = Math.sqrt(cx * cx + cy * cy);
-        var gain = activityGain(self._activityCurrent);
         var basePhase = t % 1;
-        var r1 = Math.max(0, 1 - Math.abs(dist - activePhase(basePhase) * maxR) / 1.8) * 0.9 * gain;
-        var r2 = Math.max(0, 1 - Math.abs(dist - activePhase((basePhase + 0.5) % 1) * maxR) / 1.8) * 0.9 * gain;
+        var r1 = Math.max(0, 1 - Math.abs(dist - activePhase(basePhase) * maxR) / 1.8) * 0.9;
+        var r2 = Math.max(0, 1 - Math.abs(dist - activePhase((basePhase + 0.5) % 1) * maxR) / 1.8) * 0.9;
         return Math.max(r1, r2);
       },
       batch: function (c, r) {
         // Batched inference — three concurrent decode streams at equal phase
         // offsets crossing the grid simultaneously.
         var speed = 0.7;
-        var gain = activityGain(self._activityCurrent);
-        var w1 = Math.max(0, 1 - Math.abs(c - ((t * speed)        % 1) * W) / 2) * 0.85 * gain;
-        var w2 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.33) % 1) * W) / 2) * 0.85 * gain;
-        var w3 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.66) % 1) * W) / 2) * 0.85 * gain;
+        var w1 = Math.max(0, 1 - Math.abs(c - ((t * speed)        % 1) * W) / 2) * 0.85;
+        var w2 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.33) % 1) * W) / 2) * 0.85;
+        var w3 = Math.max(0, 1 - Math.abs(c - ((t * speed + 0.66) % 1) * W) / 2) * 0.85;
         return Math.max(w1, w2, w3);
       },
       kernel_dispatch: function (c, r) {

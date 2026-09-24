@@ -430,36 +430,46 @@ describe('setActivity / setProgress', () => {
   })
 })
 
-describe('activityGain applied to mode brightness', () => {
-  const DETERMINISTIC_MODES = ['inference', 'diffusion', 'thinking', 'explore',
-    'prefill', 'video', 'batch', 'kernel_dispatch']
+describe('activityGain applied at the render layer (globalAlpha)', () => {
+  // Deliberately NOT asserting on the pre-normalisation `_heatmap` value.
+  // `_drawHeatmap` normalises each frame to its own floored, decaying
+  // maximum (`_heatScale`) — baking activityGain into a mode's raw value
+  // is invisible on screen for any mode whose peak stays above HEAT_FLOOR
+  // (0.35) at the tested activity, because the normalisation divides the
+  // gain straight back out. `ctx.globalAlpha` at the moment of `fill()` is
+  // the one quantity nothing upstream rescales, so it is what these tests
+  // check — the actual value the canvas would draw.
+  const ALL_MODES = ['idle', 'inference', 'diffusion', 'thinking', 'explore',
+    'prefill', 'video', 'batch', 'kernel_dispatch', 'agents']
 
-  async function peakHeat(mode, activity) {
+  async function maxRenderedAlpha(mode, activity) {
     const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
     viz.activate(mode)
-    viz.setActivity(activity)
-    // Easing (Task 1) has a deliberate ~0.4s half-life for smooth production
-    // motion, which a short test window can't wait out. Setting the eased
-    // value directly isolates what THIS test checks — activityGain's effect
-    // on brightness — from the easing dynamics, which have their own test.
+    // Let the heatmap populate before measuring; activity is then set
+    // directly (bypassing the eased ramp, which has its own test in
+    // "setActivity / setProgress") so this test isolates the alpha math.
+    await new Promise(resolve => setTimeout(resolve, 100))
     viz._activityCurrent = activity
-    await new Promise(resolve => setTimeout(resolve, 50))
-    const hmap = viz._heatmap
-    let peak = 0
-    for (const row of hmap) {
-      if (!row) continue
-      for (const v of row) if (typeof v === 'number' && v > peak) peak = v
-    }
+    const ctx = viz.ctx
+    let maxAlpha = 0
+    ctx.fill = () => { maxAlpha = Math.max(maxAlpha, ctx.globalAlpha) }
+    viz._drawHeatmap()
     viz.reset()
-    return peak
+    return maxAlpha
   }
 
-  DETERMINISTIC_MODES.forEach((mode) => {
-    it(`${mode}: low activity renders measurably dimmer than full activity`, async () => {
-      const dim = await peakHeat(mode, 0)
-      const bright = await peakHeat(mode, 1)
-      // activityGain(0) / activityGain(1) = 0.12/1 = 0.12, so the dim peak
-      // must be well under the bright peak's ceiling — this is the exact
+  ALL_MODES.forEach((mode) => {
+    it(`${mode}: activity=1 renders today's fixed alpha (0.6); activity=0 is measurably dimmer`, async () => {
+      const bright = await maxRenderedAlpha(mode, 1)
+      const dim = await maxRenderedAlpha(mode, 0)
+      // At activity=1, activityGain(1)=1 exactly, so alpha must be
+      // bit-identical to the pre-existing fixed 0.6 — the backward-
+      // compatibility claim, pinned at the render layer.
+      expect(bright).toBeCloseTo(0.6, 10)
+      // At activity=0, activityGain(0)=0.12 exactly.
+      expect(dim).toBeCloseTo(0.6 * 0.12, 10)
+      // activityGain(0) / activityGain(1) = 0.12/1 = 0.12, so the dim alpha
+      // must be well under the bright alpha's ceiling — this is the exact
       // gap chipviz.py's own docstring measured as "less than frame noise"
       // before this change; asserting a comfortable margin (half) makes the
       // test robust to per-mode noise while still catching a no-op gain.
