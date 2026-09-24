@@ -467,3 +467,68 @@ describe('activityGain applied to mode brightness', () => {
     })
   })
 })
+
+describe('setProgress drives ring/sweep position directly', () => {
+  it('diffusion: with progress pinned near 0, the ring sits near the center regardless of elapsed wall-clock time', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    viz.setProgress(0.02)
+    // Long enough that a wall-clock-driven ring (t % 1, full cycle ~1.3s)
+    // would have moved well away from the center by now — this is what
+    // makes the assertion below discriminate the fix from no-fix, rather
+    // than passing by coincidence of sampling near t%1≈0.
+    await new Promise(resolve => setTimeout(resolve, 800))
+    const cg = viz.chip.computeGrid
+    // Matches the mode function's own center exactly: relative cx/cy = W/2,
+    // H/2, rounded to the nearest cell and offset into absolute coordinates.
+    const relCx = (cg.colEnd - cg.colStart + 1) / 2
+    const relCy = (cg.rowEnd - cg.rowStart + 1) / 2
+    const col = cg.colStart + Math.round(relCx)
+    const row = cg.rowStart + Math.round(relCy)
+    const centerVal = viz._heatmap[row][col]
+    // At progress≈0.02 the ring radius is small, so the center cell (dist≈0)
+    // sits near the ring and should be near its brightness ceiling (~0.9 at
+    // full activity) however long the wall clock has run.
+    expect(centerVal).toBeGreaterThan(0.7)
+  })
+
+  it('diffusion: pinning progress overrides wall-clock motion between ticks', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    viz.setProgress(0.5)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const first = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const second = JSON.stringify(viz._heatmap)
+    // Wall-clock-driven diffusion would keep moving the ring every tick;
+    // pinned progress (no further setProgress call, target unchanged) means
+    // _progressCurrent has already converged and the ring holds still.
+    expect(first).toBe(second)
+    viz.reset()
+  })
+
+  it('prefill and video accept setProgress without throwing and produce a heatmap', async () => {
+    for (const mode of ['prefill', 'video']) {
+      const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+      viz.activate(mode)
+      viz.setProgress(0.3)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      expect(viz._heatmap).not.toBeNull()
+      viz.reset()
+    }
+  })
+
+  it('thinking ignores setProgress (documented non-goal — phase stays wall-clock)', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('thinking')
+    viz.setProgress(0.5)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const first = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const second = JSON.stringify(viz._heatmap)
+    // thinking's phase is wall-clock-only regardless of setProgress, so two
+    // samples taken apart in time must differ (the wave keeps moving).
+    expect(first).not.toBe(second)
+    viz.reset()
+  })
+})

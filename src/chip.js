@@ -1149,7 +1149,7 @@
       diffusion: function (c, r) {
         var cx = W / 2, cy = H / 2;
         var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
-        var ring = (t % 1) * Math.sqrt(cx * cx + cy * cy);
+        var ring = activePhase(t % 1) * Math.sqrt(cx * cx + cy * cy);
         return Math.max(0, 1 - Math.abs(dist - ring) / 2) * 0.9 * activityGain(self._activityCurrent);
       },
       agents: function (c, r) {
@@ -1169,7 +1169,7 @@
       prefill: function (c, r) {
         // Prompt ingestion — all tokens processed in parallel. Wide bright band
         // sweeps the full grid quickly (high utilisation, short burst per cycle).
-        var wave = (t * 1.5 % 1) * (W + 6) - 3;
+        var wave = activePhase(t * 1.5 % 1) * (W + 6) - 3;
         return Math.max(0, 1 - Math.abs(c - wave) / (W * 0.5)) * 0.95 * activityGain(self._activityCurrent);
       },
       video: function (c, r) {
@@ -1179,8 +1179,9 @@
         var dist = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         var maxR = Math.sqrt(cx * cx + cy * cy);
         var gain = activityGain(self._activityCurrent);
-        var r1   = Math.max(0, 1 - Math.abs(dist - (t          % 1) * maxR) / 1.8) * 0.9 * gain;
-        var r2   = Math.max(0, 1 - Math.abs(dist - ((t + 0.5)  % 1) * maxR) / 1.8) * 0.9 * gain;
+        var basePhase = t % 1;
+        var r1 = Math.max(0, 1 - Math.abs(dist - activePhase(basePhase) * maxR) / 1.8) * 0.9 * gain;
+        var r2 = Math.max(0, 1 - Math.abs(dist - activePhase((basePhase + 0.5) % 1) * maxR) / 1.8) * 0.9 * gain;
         return Math.max(r1, r2);
       },
       batch: function (c, r) {
