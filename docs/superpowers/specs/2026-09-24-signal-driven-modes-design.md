@@ -118,20 +118,31 @@ Ring/wave *speed* is left alone for every mode except where `setProgress` is
 active (next section) — activity governs intensity, not cadence, which keeps
 the metaphor's timing legible.
 
-### 3. Progress-driven phase (`diffusion`, `video`, `prefill`, `thinking`)
+### 3. Progress-driven phase (`diffusion`, `video`, `prefill`)
 
-Each of these currently computes a phase from `t % 1` (or a scaled variant).
-When `setProgress` has been called (i.e. `_progressCurrent !== null`), the
-mode uses `_progressCurrent` directly in place of `t % 1` for its ring
-radius / sweep position / wave phase. This is a drop-in substitution — same
-formula, different phase source — so the visual shape is unchanged; only
-*what drives its position* changes from "wall clock" to "the fold's actual
-step count."
+Each of these currently computes its ring radius / sweep position from
+`t % 1` (or a scaled variant) — a single 0..1 value walked by the wall
+clock. When `setProgress` has been called (i.e. `_progressCurrent !== null`),
+the mode substitutes `_progressCurrent` for that value directly, via a
+shared `activePhase(wallClockPhase)` helper. This is a drop-in substitution
+— same formula, different phase source — so the visual shape is unchanged;
+only *what drives its position* changes from "wall clock" to "the fold's
+actual step count." `video`'s two phase-offset rings both call
+`activePhase` (on `t % 1` and `(t % 1 + 0.5) % 1` respectively); when driven
+live, both collapse onto the same real value, so a live-progress `video`
+shows one ring, not two — an accepted simplification, since a single real
+scalar cannot represent two independent phase-offset positions.
 
-`thinking` is included because `trunk`'s `frac` is exactly as real as
-`diffusion`'s (both come from tt-bio's own `(step, total)`); `video`/
-`prefill` get the mechanism for free (same code path) even though no current
-`tt-bio-demo` stage maps to them.
+`thinking` is intentionally **excluded** from progress substitution even
+though `trunk`'s `frac` is exactly as real as `diffusion`'s: its phase is a
+per-cell traveling wave term (`sin(t·k + c·0.18 + r·0.12)`), not a single
+`t % 1` sweep, so there is no faithful drop-in substitution for it the way
+there is for a ring/band position. `thinking` still benefits from
+`setActivity`/`activityGain` (its amplitude and floor compress at low
+activity); making its phase progress-driven is left as a follow-up if a
+distinct visual for it is designed later, not silently invented here.
+`prefill` gets the mechanism for free (same code path) even though no
+current `tt-bio-demo` stage maps to it.
 
 ### 4. `tt-bio-demo/ui/chipviz.py` wiring
 
@@ -140,20 +151,26 @@ telemetry source, no new poll:
 
 - `_tick` already computes `clock_activity(mhz)` per chip for `flow_params`.
   Add one more `_eval` call per chip: `setActivity(i, clock_activity(mhz))`.
-- `set_chip_stages` (called from `_handle_event`'s `stage` branch) gains a
-  `frac` alongside `stage` in the mapping it's given —
-  `{card: (stage, frac)}` instead of `{card: stage}` — and converts the
-  wire's whole-fold `frac` to a within-stage fraction with the same
-  `within_stage_frac` helper `ui/panels.py` already uses, then calls
-  `setProgress(i, within_stage_frac(stage, frac))`. A chip with no stage (or
-  a stage `within_stage_frac` doesn't recognize) simply never gets a
-  `setProgress` call for that tick — the mode's existing wall-clock fallback
-  covers it.
-- `ui/app.py`'s call site (`self.chipviz_panel.set_chip_stages(self._chip_stages())`,
-  and `self._chip_stages()`'s own construction) is updated to build
-  `{card: (stage, frac)}` from its per-cell cache, since `frac` is already
-  parsed off the wire at `_handle_event`'s `stage` branch — it is stored
-  alongside `stage` in the same per-cell view rather than discarded.
+- `set_chip_stages`'s existing contract (`{card: stage}`, plain stage
+  strings/`None`) is an established call site used throughout
+  `tests/unit/test_chipviz_multichip.py`. Rather than break it, each value
+  becomes **either** a bare `stage` (unchanged, `frac` implicitly `0.0`) or
+  a `(stage, frac)` tuple — accepted per-entry, so every existing caller and
+  test keeps working unmodified, and `ui/app.py`'s real wiring is the only
+  caller that opts into the tuple form. The wire's whole-fold `frac` is
+  converted to a within-stage fraction with the same `within_stage_frac`
+  helper `ui/panels.py` already uses, then pushed via `setProgress(i, ...)`
+  on every `set_chip_stages` call (not gated on mode change, since progress
+  moves within an unchanged stage). A chip with no stage, or a `frac` that
+  fails to coerce to a number, simply never gets a `setProgress` call for
+  that tick — the mode's existing wall-clock fallback covers it.
+- `ui/app.py`'s `_SlotView` gains a `stage_frac` slot, set alongside `stage`
+  in the same `kind in ("stage", "job_start", "job_done", "job_error")`
+  block that already owns `stage` (the wire's `frac`, coerced the same way
+  the existing `stage` branch already coerces it), and cleared to `0.0`
+  wherever `stage` is cleared to `None`. `_chip_stages()` is updated to
+  build `{card: (stage, stage_frac)}` from this per-cell cache instead of
+  `{card: stage}`.
 
 Both additions are wrapped in the same broad `try`/`except` and no-op
 guards every other wire-shaped value in this module already uses; a bad or
