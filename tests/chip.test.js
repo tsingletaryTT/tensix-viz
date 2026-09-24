@@ -353,3 +353,79 @@ describe('TensixViz._drawHeatmap tensix-only guard', () => {
     expect(globalAlphas.length).toBeGreaterThan(0)
   })
 })
+
+describe('activityGain', () => {
+  it('returns exactly 1 at activity=1 (today\'s behavior, unchanged)', () => {
+    expect(TensixViz.activityGain(1)).toBe(1)
+  })
+
+  it('floors at 0.12, never fully dark', () => {
+    expect(TensixViz.activityGain(0)).toBeCloseTo(0.12, 10)
+  })
+
+  it('is linear between the floor and 1', () => {
+    expect(TensixViz.activityGain(0.5)).toBeCloseTo(0.56, 10)
+  })
+
+  it('clamps out-of-range input', () => {
+    expect(TensixViz.activityGain(2)).toBe(1)
+    expect(TensixViz.activityGain(-1)).toBeCloseTo(0.12, 10)
+  })
+})
+
+describe('setActivity / setProgress', () => {
+  it('defaults to activity=1, progress=null before any call', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    expect(viz._activityTarget).toBe(1)
+    expect(viz._progressTarget).toBeNull()
+  })
+
+  it('clamps setActivity to [0,1]', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setActivity(2)
+    expect(viz._activityTarget).toBe(1)
+    viz.setActivity(-1)
+    expect(viz._activityTarget).toBe(0)
+    viz.setActivity(0.42)
+    expect(viz._activityTarget).toBeCloseTo(0.42, 10)
+  })
+
+  it('ignores non-numeric setActivity input', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setActivity(0.7)
+    viz.setActivity('busy')
+    viz.setActivity(NaN)
+    expect(viz._activityTarget).toBeCloseTo(0.7, 10)
+  })
+
+  it('clamps setProgress to [0,1] and ignores non-numeric input', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setProgress(1.5)
+    expect(viz._progressTarget).toBe(1)
+    viz.setProgress(-0.5)
+    expect(viz._progressTarget).toBe(0)
+    viz.setProgress('nope')
+    expect(viz._progressTarget).toBe(0)
+  })
+
+  it('reset() restores activity/progress to their defaults', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setActivity(0.1)
+    viz.setProgress(0.9)
+    viz.reset()
+    expect(viz._activityTarget).toBe(1)
+    expect(viz._progressTarget).toBeNull()
+  })
+
+  it('activate() eases _activityCurrent toward a target set before it ticks', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('idle')
+    viz.setActivity(0)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    // Started at 1 (activate()'s reset default), eased toward 0 — must have
+    // moved substantially within ~6 ticks (100ms / 16ms setTimeout rAF).
+    expect(viz._activityCurrent).toBeLessThan(0.9)
+    expect(viz._activityCurrent).toBeGreaterThanOrEqual(0)
+    viz.reset()
+  })
+})
