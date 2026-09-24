@@ -500,6 +500,7 @@ describe('setProgress drives ring/sweep position directly', () => {
     // sits near the ring and should be near its brightness ceiling (~0.9 at
     // full activity) however long the wall clock has run.
     expect(centerVal).toBeGreaterThan(0.7)
+    viz.reset()
   })
 
   it('diffusion: pinning progress overrides wall-clock motion between ticks', async () => {
@@ -539,6 +540,71 @@ describe('setProgress drives ring/sweep position directly', () => {
     // thinking's phase is wall-clock-only regardless of setProgress, so two
     // samples taken apart in time must differ (the wave keeps moving).
     expect(first).not.toBe(second)
+    viz.reset()
+  })
+})
+
+describe('no mode function applies its own activityGain', () => {
+  // activityGain must live in exactly one place: _drawHeatmap's rendered
+  // alpha (see "activityGain applied at the render layer"). A mode function
+  // that also multiplies its own pre-normalisation value double-scales at
+  // low activity, because that self-multiplication can push the mode's own
+  // peak below HEAT_FLOOR, changing how _drawHeatmap's normalisation treats
+  // it -- exactly what happened when kernel_dispatch kept a leftover
+  // `* activityGain(...)` from an earlier draft of the render-layer fix.
+  // Behavioral testing of this through kernel_dispatch's own multi-kernel
+  // stochastic simulation is unreliable (kernel age/dispatch timing varies
+  // run to run independent of activity), so this pins the invariant at the
+  // source level instead: no mode body may reference activityGain.
+  it('the MODES table never calls activityGain (only _drawHeatmap does)', async () => {
+    const fs = await import('fs')
+    const src = fs.readFileSync(new URL('../src/chip.js', import.meta.url), 'utf8')
+    const start = src.indexOf('var MODES = {')
+    const end = src.indexOf('\n    var fn = MODES[mode];')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const modesBody = src.slice(start, end)
+    expect(modesBody).not.toContain('activityGain')
+  })
+})
+
+describe('setProgress(null) clears a stale override', () => {
+  it('falls back to the wall-clock phase after setProgress(null)', async () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    viz.setProgress(0.5)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const pinned1 = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const pinned2 = JSON.stringify(viz._heatmap)
+    // Sanity: progress really is pinned before clearing it.
+    expect(pinned1).toBe(pinned2)
+
+    viz.setProgress(null)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const cleared1 = JSON.stringify(viz._heatmap)
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const cleared2 = JSON.stringify(viz._heatmap)
+    // Once cleared, the wall clock is moving again, so two samples taken
+    // apart in time must differ -- the same discriminator the "overrides
+    // wall-clock motion" test uses for the pinned case, inverted.
+    expect(cleared1).not.toBe(cleared2)
+    viz.reset()
+  })
+
+  it('setProgress(null) is a no-op when progress was never set', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.activate('diffusion')
+    expect(() => viz.setProgress(null)).not.toThrow()
+    expect(viz._progressTarget).toBeNull()
+    viz.reset()
+  })
+
+  it('still rejects non-numeric, non-null input', () => {
+    const viz = new TensixViz(makeCanvas(), { arch: 'blackhole' })
+    viz.setProgress(0.4)
+    viz.setProgress('nope')
+    expect(viz._progressTarget).toBeCloseTo(0.4, 10)
     viz.reset()
   })
 })

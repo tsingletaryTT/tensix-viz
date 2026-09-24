@@ -620,6 +620,10 @@ TensixViz.prototype.setActivity = function(value) {
   this._activityTarget = Math.max(0, Math.min(1, value));
 };
 TensixViz.prototype.setProgress = function(value) {
+  if (value === null) {
+    this._progressTarget = null;
+    return;
+  }
   if (typeof value !== "number" || !isFinite(value)) return;
   this._progressTarget = Math.max(0, Math.min(1, value));
 };
@@ -984,7 +988,7 @@ TensixViz.prototype.activate = function(mode, opts) {
         var fadeIn = Math.min(1, effectiveAge / 4);
         var fadeOut = Math.min(1, (k.maxAge - k.age) / 10);
         var noise = 0.72 + 0.28 * Math.sin(c2 * 7.3 + r2 * 4.1 + k.seed + t * 6);
-        val = Math.max(val, fadeIn * fadeOut * noise * 0.88 * activityGain(self._activityCurrent));
+        val = Math.max(val, fadeIn * fadeOut * noise * 0.88);
       }
       return val;
     }

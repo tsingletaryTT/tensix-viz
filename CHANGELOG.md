@@ -13,11 +13,14 @@ All notable changes to tensix-viz are documented here.
   `prefill`'s ring/sweep position can be driven by real structural progress
   instead of wall-clock time via `setProgress()`. Both default to
   reproducing the exact pre-1.3.0 output when never called — no existing
-  caller changes. Fixes the specific gap measured in `tt-bio-demo`'s
-  `ui/chipviz.py` docstring, where feeding a chip's canvas 0.0 vs. 1.0
-  activity produced pixel statistics indistinguishable from frame noise,
-  because the only prior telemetry input (`setMemoryStats`) never touched
-  the per-core heatmap itself.
+  caller changes. This is the library-side half of a fix for a gap
+  `tt-bio-demo`'s `ui/chipviz.py` docstring had measured and documented
+  (feeding a chip's canvas 0.0 vs. 1.0 activity produced pixel statistics
+  indistinguishable from frame noise, because the only prior telemetry
+  input, `setMemoryStats`, never touched the per-core heatmap itself) —
+  closing it in practice also requires a consumer to call these new
+  setters, which is `tt-bio-demo`'s own change (its `ui/chipviz.py` and
+  `ui/app.py`, in that repo, not this checkout).
 
 ### Fixed
 
@@ -36,6 +39,24 @@ All notable changes to tensix-viz are documented here.
   brightness tests now assert on that rendered alpha rather than the
   pre-normalisation heatmap, which could not distinguish "gained but
   canceled" from "not gained at all."
+
+- **`kernel_dispatch` no longer double-applies `activityGain`** (`src/chip.js`).
+  A leftover `* activityGain(...)` from before the render-layer fix above was
+  still multiplying this mode's own pre-normalisation value, on top of the
+  now-correct alpha-layer application — dimming it twice at low activity,
+  unlike every other mode. Found in GitHub Copilot's review of the PR.
+  Pinned with a source-level invariant test (no mode body may reference
+  `activityGain`) rather than a behavioral one, since `kernel_dispatch`'s
+  stochastic multi-kernel simulation makes timing-based assertions
+  unreliable.
+
+- **`setProgress(null)` now clears a stale progress override** (`src/chip.js`).
+  Previously there was no way to return to the wall-clock fallback once
+  `setProgress` had been called with a real value — a caller that simply
+  stopped sending progress (a chip whose stage no longer has one, or whose
+  telemetry becomes momentarily unavailable) left the ring permanently
+  pinned at its last value instead of resuming motion, contradicting the
+  documented fallback behavior. Also found in review.
 
 ## [1.2.1] - 2026-08-20
 

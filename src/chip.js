@@ -826,6 +826,13 @@
   };
 
   TensixViz.prototype.setProgress = function (value) {
+    // `null` explicitly clears a prior override, falling back to the
+    // mode's own wall-clock phase — the only way to do so short of a full
+    // reset()/activate(). Without it, a caller that stops sending progress
+    // (e.g. a chip whose stage no longer has one, or whose telemetry
+    // becomes momentarily unavailable) leaves the ring permanently pinned
+    // at its last real value instead of resuming motion.
+    if (value === null) { this._progressTarget = null; return; }
     if (typeof value !== 'number' || !isFinite(value)) return;
     this._progressTarget = Math.max(0, Math.min(1, value));
   };
@@ -1270,7 +1277,7 @@
           // (avoids per-frame random() flicker while still giving texture).
           var noise = 0.72 + 0.28 * Math.sin(c * 7.3 + r * 4.1 + k.seed + t * 6);
 
-          val = Math.max(val, fadeIn * fadeOut * noise * 0.88 * activityGain(self._activityCurrent));
+          val = Math.max(val, fadeIn * fadeOut * noise * 0.88);
         }
         return val;
       },
