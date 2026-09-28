@@ -1578,6 +1578,10 @@ ClusterViz.prototype._init = function() {
   const grid = document.createElement("div");
   grid.classList.add("tv-cluster-grid");
   grid.style.gridTemplateColumns = "repeat(" + this._cols + ", 1fr)";
+  const tilePx = this._dotMode ? 10 : 32;
+  const gapPx = this._dotMode ? 2 : 3;
+  grid.style.width = this._cols * tilePx + (this._cols - 1) * gapPx + "px";
+  grid.style.maxWidth = "100%";
   container.appendChild(grid);
   this._grid = grid;
   for (let i = 0; i < this.chipCount; i++) {

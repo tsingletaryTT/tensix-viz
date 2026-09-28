@@ -2,6 +2,30 @@
 
 All notable changes to tensix-viz are documented here.
 
+## [1.3.2] - 2026-09-28
+
+### Fixed
+
+- **Cluster views no longer collapse to their caption's width**
+  (`src/cluster.js`). Cluster tiles are empty divs with no width of their own,
+  so a shrink-to-fit parent sized the whole widget to its one-line spec text —
+  Galaxy SC's 128 chips rendered as 2.7px dots. The tile grid now gets a
+  preferred width from its column count (32px tiles, or 10px dots above 64
+  chips) and `max-width: 100%`, so it still shrinks on phones.
+- **Zoomed cluster breadcrumb no longer covers the spec caption**
+  (`tensix-viz.css`). `.tv-cluster.tv-zoomed-in` reserves room at the top for
+  the "Cluster › Server N" breadcrumb.
+
+### Docs site (landing page)
+
+- Hero and two-column sections now stack at 1120px instead of 900px. Between
+  those widths the QB2 hero chips were squeezed to ~120px and the Memory code
+  block hid up to ~140px of each line; the hero now gets full 340px chips there.
+- Code blocks wrap at ≤800px instead of hiding most of each line in a sideways
+  scroll box (the Quick-start block hid ~400px per line on a phone).
+- Phones: tighter padding around the hero system (chips 85px → 119px at
+  375px wide), and `kernel_dispatch` may wrap so the mode table fits.
+
 ## [1.3.1] - 2026-09-28
 
 ### Fixed

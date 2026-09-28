@@ -78,6 +78,15 @@ ClusterViz.prototype._init = function () {
   const grid = document.createElement('div')
   grid.classList.add('tv-cluster-grid')
   grid.style.gridTemplateColumns = 'repeat(' + this._cols + ', 1fr)'
+  // Tiles are empty divs with no intrinsic width, so without this a
+  // shrink-to-fit parent sized the whole cluster to its spec caption (Galaxy
+  // SC's 128 chips came out as 2.7px dots). Give the grid a preferred width
+  // from its column count; max-width lets it still shrink on narrow screens.
+  // Tile and gap sizes must match the gap values in tensix-viz.css.
+  const tilePx = this._dotMode ? 10 : 32
+  const gapPx  = this._dotMode ? 2 : 3
+  grid.style.width    = (this._cols * tilePx + (this._cols - 1) * gapPx) + 'px'
+  grid.style.maxWidth = '100%'
   container.appendChild(grid)
   this._grid = grid
 
