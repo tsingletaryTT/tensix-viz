@@ -8,12 +8,15 @@
   <link rel="stylesheet" href="../site.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #0a1420; color: #c0ccd8; margin: 0; padding: 0; }
-    .page-body { padding: 32px; }
+    .page-body { padding: clamp(16px, 4vw, 32px); }
     h1 { color: #4fd1c5; font-size: 1.4rem; margin-bottom: 4px; }
     h2 { color: #81e6d9; font-size: 1rem; margin: 32px 0 12px; border-bottom: 1px solid #1a3c47; padding-bottom: 6px; }
     p  { color: #607d8b; font-size: 0.875rem; margin-bottom: 16px; }
     .demo-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 24px; }
-    .demo-card { background: #0d1f2d; border: 1px solid #1a3c47; border-radius: 8px; padding: 16px; }
+    /* max-width/min-width let a card shrink below its canvas's preferred width
+       on phones; the canvas then scales down via its own max-width: 100%. */
+    .demo-card { background: #0d1f2d; border: 1px solid #1a3c47; border-radius: 8px; padding: 16px;
+                 max-width: 100%; min-width: 0; box-sizing: border-box; }
     .mode-btn  {
       background: none; border: 1px solid #1a3c47; color: #81e6d9;
       border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 0.8rem;
@@ -40,7 +43,7 @@
   <p>All four renderer classes, all ten animation modes, and all three themes. Use the controls to switch modes and palettes live.</p>
 
   <!-- ── Theme toggle ───────────────────────────────────────────────────── -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:10px 14px;background:#0d1f2d;border:1px solid #1a3c47;border-radius:6px">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:28px;padding:10px 14px;background:#0d1f2d;border:1px solid #1a3c47;border-radius:6px">
     <span style="font-size:0.78rem;color:#607d8b;margin-right:2px">Page theme:</span>
     <button class="mode-btn active" id="btn-dark"  onclick="setTheme('dark')">Dark</button>
     <button class="mode-btn"        id="btn-light" onclick="setTheme('light')">Light</button>

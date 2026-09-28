@@ -205,7 +205,7 @@ var _TensixVizBundle = (() => {
     var dpr = typeof window !== "undefined" && window.devicePixelRatio || 1;
     var logicalW = canvas.width;
     var logicalH = canvas.height;
-    if (typeof window !== "undefined" && canvas.parentElement) {
+    if (opts.fitContainer !== false && typeof window !== "undefined" && canvas.parentElement) {
       var containerW = canvas.parentElement.clientWidth;
       if (containerW > 0 && containerW < logicalW) {
         logicalH = Math.round(logicalH * containerW / logicalW);
@@ -217,7 +217,9 @@ var _TensixVizBundle = (() => {
     canvas.width = Math.round(logicalW * dpr);
     canvas.height = Math.round(logicalH * dpr);
     canvas.style.width = logicalW + "px";
-    canvas.style.height = logicalH + "px";
+    canvas.style.maxWidth = "100%";
+    canvas.style.height = "auto";
+    canvas.style.aspectRatio = logicalW + " / " + logicalH;
     this.ctx = canvas.getContext("2d");
     if (dpr > 1) {
       this.ctx.scale(dpr, dpr);
@@ -1346,7 +1348,7 @@ var _TensixVizBundle = (() => {
       container.appendChild(wrapper);
       self._chipEls.push(wrapper);
       const chipTopo = loadTopology(chipName);
-      const viz = new TensixViz(canvas, { arch: chipTopo.arch });
+      const viz = new TensixViz(canvas, { arch: chipTopo.arch, fitContainer: false });
       self._chips.push(viz);
       if (i < topo.chips.length - 1) {
         const link = document.createElement("div");

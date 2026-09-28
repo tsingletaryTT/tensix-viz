@@ -208,13 +208,24 @@
     this._dram    = [];   // array of { col, row } for every dram-type cell
     this._compute = [];   // array of { col, row } for every tensix-type cell
 
-    // Responsive sizing: cap logical dimensions to the container's actual width
-    // so the canvas never overflows narrow viewports. The HTML width/height
-    // attributes are the preferred size; clientWidth is the hard ceiling.
+    // Responsive sizing, in two layers:
+    //
+    // 1. Construction-time cap (default on): shrink the logical drawing space to
+    //    the container's width so a narrow standalone chip draws at its real
+    //    size rather than being scaled down. The HTML width/height attributes
+    //    are the preferred size; clientWidth is the ceiling. This runs ONCE, so
+    //    it is only trustworthy when the parent's width doesn't depend on
+    //    siblings still being built. Multi-chip layouts (CardViz) build chips
+    //    one at a time into a flex row, where each chip would measure the room
+    //    left by the ones before it — they pass fitContainer: false instead.
+    // 2. CSS scaling (always): max-width 100% + height auto + aspect-ratio lets
+    //    the browser shrink the canvas afterwards (resizes, late layout, flex
+    //    rows) without distorting it. An inline pixel height here would pin the
+    //    height while max-width squeezed the width, squishing the grid.
     var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
     var logicalW = canvas.width;
     var logicalH = canvas.height;
-    if (typeof window !== 'undefined' && canvas.parentElement) {
+    if (opts.fitContainer !== false && typeof window !== 'undefined' && canvas.parentElement) {
       var containerW = canvas.parentElement.clientWidth;
       if (containerW > 0 && containerW < logicalW) {
         logicalH = Math.round(logicalH * containerW / logicalW);
@@ -228,8 +239,10 @@
     // on HiDPI / Retina screens (VSCode webview, high-DPI monitors).
     canvas.width        = Math.round(logicalW * dpr);
     canvas.height       = Math.round(logicalH * dpr);
-    canvas.style.width  = logicalW + 'px';
-    canvas.style.height = logicalH + 'px';
+    canvas.style.width       = logicalW + 'px';
+    canvas.style.maxWidth    = '100%';
+    canvas.style.height      = 'auto';
+    canvas.style.aspectRatio = logicalW + ' / ' + logicalH;
     // Obtain context after sizing so getContext() returns the post-resize context.
     this.ctx = canvas.getContext('2d');
     if (dpr > 1) {

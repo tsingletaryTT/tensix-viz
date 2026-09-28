@@ -60,3 +60,29 @@ describe('CardViz', () => {
     expect(() => new CardViz(container, 'bad-config')).toThrow()
   })
 })
+
+// Regression: chips were built one at a time inside a flex row, and each
+// TensixViz capped itself to its wrapper's clientWidth at that moment — so
+// later chips measured a space already squeezed by earlier ones and came out
+// half-size. Card chips must all keep the same logical size and leave fitting
+// to CSS.
+describe('CardViz chip sizing', () => {
+  it('gives every chip the same logical size regardless of wrapper width at build time', () => {
+    const origCreate = document.createElement
+    let n = 0
+    // Simulate a squeezed flex row: each successive wrapper reports less room.
+    document.createElement = (tag) => {
+      const el = origCreate(tag)
+      if (tag === 'div') el.clientWidth = Math.max(40, 200 - 80 * n++)
+      return el
+    }
+    try {
+      const viz = new CardViz(makeDiv(), 'bh-p300c')
+      const sizes = viz._chips.map(c => [c._logicalW, c._logicalH])
+      expect(sizes).toEqual([[340, 240], [340, 240]])
+      viz.destroy()
+    } finally {
+      document.createElement = origCreate
+    }
+  })
+})
