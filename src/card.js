@@ -52,7 +52,11 @@ CardViz.prototype._init = function () {
     // Resolve chip topology and build a TensixViz for it.
     // Callers can invoke activate('idle') explicitly if they want the RAF loop.
     const chipTopo = loadTopology(chipName)
-    const viz = new TensixViz(canvas, { arch: chipTopo.arch })
+    // fitContainer: false — chips are built one at a time into a flex row, so
+    // a construction-time measurement would size each chip by the room its
+    // predecessors left. Keep every chip at the full logical size and let the
+    // CSS in tensix-viz.css (flex: 1 1 0 wrappers + max-width canvases) fit them.
+    const viz = new TensixViz(canvas, { arch: chipTopo.arch, fitContainer: false })
     self._chips.push(viz)
 
     // ETH link divider between chips (except after last)

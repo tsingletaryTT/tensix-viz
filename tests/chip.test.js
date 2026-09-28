@@ -608,3 +608,25 @@ describe('setProgress(null) clears a stale override', () => {
     viz.reset()
   })
 })
+
+// ─── CSS-scaling contract ──────────────────────────────────────────────────
+// The construction-time cap above only runs once, so it can't track later
+// layout changes. After construction the canvas must be free to shrink via
+// CSS (max-width: 100%) WITHOUT distorting: an inline pixel height would pin
+// the height while max-width squeezed the width, squishing the grid.
+describe('TensixViz CSS scaling', () => {
+  it('lets CSS shrink the canvas: max-width 100%, height auto', () => {
+    const viz = new TensixViz(makeCanvas(340, 240), { arch: 'blackhole' })
+    expect(viz.canvas.style.width).toBe('340px')
+    expect(viz.canvas.style.maxWidth).toBe('100%')
+    expect(viz.canvas.style.height).toBe('auto')
+    expect(viz.canvas.style.aspectRatio).toBe('340 / 240')
+  })
+
+  it('fitContainer: false skips the construction-time cap', () => {
+    const { canvas } = makeCanvasInContainer(340, 240, 60)
+    const viz = new TensixViz(canvas, { arch: 'blackhole', fitContainer: false })
+    expect(viz._logicalW).toBe(340)
+    expect(viz._logicalH).toBe(240)
+  })
+})
