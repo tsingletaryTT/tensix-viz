@@ -188,9 +188,27 @@
     footer .sep { color: var(--border); }
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
-    @media (max-width: 900px) {
-      .hero-inner    { grid-template-columns: minmax(0, 1fr); }
+    /* Stack at 1120px, not 900px: between those widths the two-column layout
+       squeezed the hero's four QB2 chips to ~120px and made the Memory
+       section's code block hide up to ~140px of every line. */
+    @media (max-width: 1120px) {
+      .hero-inner    { grid-template-columns: minmax(0, 1fr); gap: 3rem; }
       .chip-anatomy  { grid-template-columns: minmax(0, 1fr); }
+    }
+    /* Tablets and phones: wrap code instead of hiding the end of each line in
+       a sideways scroll box. */
+    @media (max-width: 800px) {
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    }
+    /* Phones: give the hero chips back the padding around them, and let the
+       long `kernel_dispatch` name wrap so the table fits. */
+    @media (max-width: 640px) {
+      pre { padding: 1rem; }
+      .ref-table td:first-child code { overflow-wrap: anywhere; }
+      .hero-canvas-wrap { padding: 8px; }
+      .hero-canvas-wrap .tv-system { padding: 8px; }
+      .hero-canvas-wrap .tv-card   { padding: 6px; gap: 4px; }
+      .ref-table th, .ref-table td { padding: 8px 6px; }
     }
   </style>
 </head>

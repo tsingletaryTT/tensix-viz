@@ -65,3 +65,24 @@ describe('ClusterViz', () => {
     viz.destroy()
   })
 })
+
+// Regression: tiles are empty divs with no intrinsic width, so a shrink-to-fit
+// parent sized the whole cluster to its one-line spec caption — Galaxy SC's
+// 128 chips rendered as 2.7px dots. The grid now carries a preferred width
+// derived from its column count, capped by max-width so phones still shrink it.
+describe('ClusterViz grid sizing', () => {
+  it('gives the tile grid a preferred width from its column count (tile mode)', () => {
+    const viz = new ClusterViz(document.createElement('div'), 'bh-galaxy')
+    // 8 cols × 32px tiles + 7 × 3px gaps
+    expect(viz._grid.style.width).toBe((8 * 32 + 7 * 3) + 'px')
+    expect(viz._grid.style.maxWidth).toBe('100%')
+    viz.destroy()
+  })
+
+  it('uses smaller tiles in dot mode', () => {
+    const viz = new ClusterViz(document.createElement('div'), 'bh-galaxy-sc')
+    // 32 cols × 10px dots + 31 × 2px gaps
+    expect(viz._grid.style.width).toBe((32 * 10 + 31 * 2) + 'px')
+    viz.destroy()
+  })
+})

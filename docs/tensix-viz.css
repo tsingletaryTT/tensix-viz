@@ -373,6 +373,7 @@
 
 .tv-cluster-grid {
   display: grid;
+  margin: 0 auto;   /* width is set inline by ClusterViz; center it under the spec */
   grid-template-columns: repeat(8, 1fr);
   gap: 3px;
 }
@@ -412,3 +413,7 @@
 /* ─── Zoom state ────────────────────────────────────────────────────────── */
 
 .tv-zoomed-in { overflow: visible; }
+
+/* The cluster's spec caption sits at the very top of the container, exactly
+   where the absolutely-positioned breadcrumb lands — make room for it. */
+.tv-cluster.tv-zoomed-in { padding-top: 32px; }
